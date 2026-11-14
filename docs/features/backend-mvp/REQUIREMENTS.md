@@ -41,7 +41,7 @@ There are no accounts, passwords, pagination, filtering, Stripe webhooks, durabl
 
 ## Integration evidence and remaining limits
 
-The Mini-IPIP direction keys were checked against the [official Mini-IPIP key](https://www.ipip.ori.org/MiniIPIPKey.htm). The low/mid/high ranges are the product's display bands, not population norms or diagnostic cutoffs. The LLM package currently provides a deterministic, profile-aware English mock and system prompt; it does not make network calls. Supplying an LLM key alone does not add a hosted adapter.
+The Mini-IPIP direction keys were checked against the [official Mini-IPIP key](https://www.ipip.ori.org/MiniIPIPKey.htm). The low/mid/high ranges are the product's display bands, not population norms or diagnostic cutoffs. The LLM package provides a deterministic, profile-aware English mock (default, no network calls) and OpenAI (Chat Completions) and Anthropic (Messages API, official Go SDK) adapters enabled by `LLM_API_KEY` and selected by `LLM_PROVIDER`. With the adapter, the current partner's answers and profile are sent to the chosen provider after the safety gate passes; output is schema-constrained, checked for prohibited words, and validated by the service. Thermometer and `ready` stages stay deterministic. There is no retry, evaluation suite, or fallback to the mock on failure: errors surface as `generation_unavailable`.
 
 Safety is a conservative English/Russian phrase gate. It can miss unfamiliar wording and languages, and may stop on negated or quoted phrases. The backend prompt specifies US resources; these are fixed for the US-targeted demo, not selected through geolocation. The connected hotline lookup verified the crisis resource during implementation.
 

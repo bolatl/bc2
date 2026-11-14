@@ -1,10 +1,27 @@
+# Secrets and local environment
 .env
 .env.*
 !.env.example
+
+# Build and test output
 /bin/
 /coverage.out
 *.test
+*.out
 __pycache__/
+
+# Local curl/Postman artifacts (session cookies, saved responses, screenshots)
+*.jar
+*.log
+flow.log
+/scripts/out/
+telegram-cloud-photo-*
+
+# IDE and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
 
 # Local source material; generated documentation and project skills stay tracked.
 /LoveLab_BACKEND_PROMPT.md

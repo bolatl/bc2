@@ -11,10 +11,10 @@ import (
 )
 
 type Config struct {
-	Addr, FrontendURL, SessionSecret, StripeSecretKey, LLMAPIKey string
-	AllowedOrigins                                               []string
-	CookieSecure, EnableRehearsal                                bool
-	FreeTurns, MaxTurns, DivergenceThreshold                     int
+	Addr, FrontendURL, SessionSecret, StripeSecretKey, LLMAPIKey, LLMProvider, LLMModel, LLMBaseURL string
+	AllowedOrigins                                                                                  []string
+	CookieSecure, EnableRehearsal                                                                   bool
+	FreeTurns, MaxTurns, DivergenceThreshold                                                        int
 }
 
 func Default() Config {
@@ -22,10 +22,19 @@ func Default() Config {
 }
 func Load() (Config, error) {
 	c := Default()
-	for key, dst := range map[string]*string{"ADDR": &c.Addr, "FRONTEND_URL": &c.FrontendURL, "SESSION_SECRET": &c.SessionSecret, "STRIPE_SECRET_KEY": &c.StripeSecretKey, "LLM_API_KEY": &c.LLMAPIKey} {
+	for key, dst := range map[string]*string{"ADDR": &c.Addr, "FRONTEND_URL": &c.FrontendURL, "SESSION_SECRET": &c.SessionSecret, "STRIPE_SECRET_KEY": &c.StripeSecretKey, "LLM_API_KEY": &c.LLMAPIKey, "LLM_PROVIDER": &c.LLMProvider, "LLM_MODEL": &c.LLMModel, "LLM_BASE_URL": &c.LLMBaseURL} {
 		if v := os.Getenv(key); v != "" {
 			*dst = v
 		}
+	}
+	c.LLMProvider = strings.ToLower(strings.TrimSpace(c.LLMProvider))
+	if c.LLMProvider == "" && c.LLMAPIKey != "" && strings.HasPrefix(c.LLMAPIKey, "sk-ant-") {
+		c.LLMProvider = "anthropic"
+	} else if c.LLMProvider == "" && c.LLMAPIKey != "" {
+		c.LLMProvider = "openai"
+	}
+	if c.LLMProvider != "" && c.LLMProvider != "openai" && c.LLMProvider != "anthropic" {
+		return c, fmt.Errorf("LLM_PROVIDER must be openai or anthropic")
 	}
 	c.FrontendURL = strings.TrimRight(c.FrontendURL, "/")
 	if err := validURL(c.FrontendURL); err != nil {
