@@ -1,0 +1,750 @@
+{
+  "description": "Fixture manifest. Only each response object is an endpoint payload; scenarios are independent examples, not a replay script.",
+  "scenarios": [
+    {
+      "name": "create-couple",
+      "method": "POST",
+      "path": "/api/v1/couples",
+      "status": 201,
+      "request": {
+        "age": "30-34",
+        "relationshipStatus": "married",
+        "togetherDuration": "3-7",
+        "hasKids": "no",
+        "conflictStyle": "talk_now",
+        "repairNeed": "plan",
+        "fightTopics": [
+          "chores",
+          "time_attention"
+        ],
+        "goal": "understand_each_other"
+      },
+      "response": {
+        "coupleId": "couple_demo",
+        "inviteUrl": "",
+        "partnerBStatus": "not_invited",
+        "partnerBInviteSentAt": null,
+        "defaultPlan": "yearly",
+        "subscription": null,
+        "personalityDone": false,
+        "createdAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "couple-after-ready",
+      "method": "GET",
+      "path": "/api/v1/couples/me",
+      "status": 200,
+      "response": {
+        "coupleId": "couple_demo",
+        "inviteUrl": "http://localhost:5173/invites/invite_demo",
+        "partnerBStatus": "ready",
+        "partnerBInviteSentAt": "2026-11-15T04:05:00Z",
+        "defaultPlan": "yearly",
+        "subscription": {
+          "plan": "yearly",
+          "status": "active",
+          "activatedAt": "2026-11-15T04:03:00Z"
+        },
+        "personalityDone": true,
+        "createdAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "delete-everything",
+      "method": "DELETE",
+      "path": "/api/v1/couples/me",
+      "status": 204
+    },
+    {
+      "name": "invite-preview",
+      "method": "GET",
+      "path": "/api/v1/invites/invite_demo",
+      "status": 200,
+      "response": {
+        "neutralTopic": "chores",
+        "message": "Your partner is ready to talk. Take a few minutes to prepare privately; your answers stay yours."
+      }
+    },
+    {
+      "name": "partner-join",
+      "method": "POST",
+      "path": "/api/v1/invites/invite_demo/join",
+      "status": 200,
+      "request": {
+        "age": "30-34",
+        "conflictStyle": "need_space",
+        "repairNeed": "being_heard"
+      },
+      "response": {
+        "coupleId": "couple_demo",
+        "partnerRole": "B",
+        "neutralTopic": "chores"
+      }
+    },
+    {
+      "name": "personality-submit",
+      "method": "POST",
+      "path": "/api/v1/personality-tests",
+      "status": 200,
+      "request": {
+        "answers": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      },
+      "response": {
+        "traits": {
+          "e": {
+            "score": 12,
+            "level": "mid"
+          },
+          "a": {
+            "score": 12,
+            "level": "mid"
+          },
+          "c": {
+            "score": 12,
+            "level": "mid"
+          },
+          "n": {
+            "score": 12,
+            "level": "mid"
+          },
+          "i": {
+            "score": 12,
+            "level": "mid"
+          }
+        },
+        "strengths": [
+          "You can balance your own needs with attention to another person.",
+          "You can combine a practical next step with room to adjust.",
+          "You can use both familiar examples and new perspectives."
+        ],
+        "tips": [
+          "When upset, name what you feel before choosing the next step.",
+          "When upset, choose a message or a conversation based on what feels manageable."
+        ],
+        "completedAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "personality-read",
+      "method": "GET",
+      "path": "/api/v1/personality-tests/me",
+      "status": 200,
+      "response": {
+        "traits": {
+          "e": {
+            "score": 12,
+            "level": "mid"
+          },
+          "a": {
+            "score": 12,
+            "level": "mid"
+          },
+          "c": {
+            "score": 12,
+            "level": "mid"
+          },
+          "n": {
+            "score": 12,
+            "level": "mid"
+          },
+          "i": {
+            "score": 12,
+            "level": "mid"
+          }
+        },
+        "strengths": [
+          "You can balance your own needs with attention to another person.",
+          "You can combine a practical next step with room to adjust.",
+          "You can use both familiar examples and new perspectives."
+        ],
+        "tips": [
+          "When upset, name what you feel before choosing the next step.",
+          "When upset, choose a message or a conversation based on what feels manageable."
+        ],
+        "completedAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "session-start",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions",
+      "status": 201,
+      "request": {},
+      "response": {
+        "sessionId": "session_a_demo",
+        "status": "in_progress",
+        "tier": "free_short",
+        "stage": "thermometer_start",
+        "turns": [],
+        "currentTurn": {
+          "type": "next_turn",
+          "stage": "thermometer_start",
+          "turnIndex": 0,
+          "agentQuestion": "How upset are you right now, from 1 to 10?",
+          "optionLeft": "3",
+          "optionRight": "8",
+          "progressStageIndex": null,
+          "turnsUsed": 0,
+          "turnsMax": 4
+        },
+        "thermometerStart": null,
+        "thermometerEnd": null,
+        "createdAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "session-reload",
+      "method": "GET",
+      "path": "/api/v1/fight-sessions/session_a_demo",
+      "status": 200,
+      "response": {
+        "sessionId": "session_a_demo",
+        "status": "in_progress",
+        "tier": "free_short",
+        "stage": "facts",
+        "turns": [
+          {
+            "turnIndex": 0,
+            "stage": "thermometer_start",
+            "agentQuestion": "How upset are you right now, from 1 to 10?",
+            "optionLeft": "3",
+            "optionRight": "8",
+            "answerSource": "free_text",
+            "answerText": "8"
+          }
+        ],
+        "currentTurn": {
+          "type": "next_turn",
+          "stage": "facts",
+          "turnIndex": 1,
+          "agentQuestion": "What happened, in a few words, without guessing intentions?",
+          "optionLeft": "We disagreed about a household task",
+          "optionRight": "I wanted more time together",
+          "progressStageIndex": 1,
+          "turnsUsed": 1,
+          "turnsMax": 4
+        },
+        "thermometerStart": 8,
+        "thermometerEnd": null,
+        "createdAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "next-turn",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/turns",
+      "status": 200,
+      "request": {
+        "turnIndex": 0,
+        "answerSource": "free_text",
+        "answerText": "8"
+      },
+      "response": {
+        "type": "next_turn",
+        "stage": "facts",
+        "turnIndex": 1,
+        "agentQuestion": "What happened, in a few words, without guessing intentions?",
+        "optionLeft": "We disagreed about a household task",
+        "optionRight": "I wanted more time together",
+        "progressStageIndex": 1,
+        "turnsUsed": 1,
+        "turnsMax": 4
+      }
+    },
+    {
+      "name": "paywall",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/turns",
+      "status": 200,
+      "request": {
+        "turnIndex": 3,
+        "answerSource": "free_text",
+        "answerText": "I needed a shared plan."
+      },
+      "response": {
+        "type": "paywall_required",
+        "availablePlans": [
+          {
+            "plan": "monthly",
+            "priceUsd": 14.99,
+            "isDefault": false
+          },
+          {
+            "plan": "yearly",
+            "priceUsd": 99,
+            "isDefault": true
+          },
+          {
+            "plan": "program",
+            "priceUsd": 149,
+            "isDefault": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "completed-turn",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/turns",
+      "status": 200,
+      "request": {
+        "turnIndex": 6,
+        "answerSource": "free_text",
+        "answerText": "I'm ready to talk"
+      },
+      "response": {
+        "type": "completed",
+        "resultUrl": "/api/v1/fight-sessions/session_a_demo/result"
+      }
+    },
+    {
+      "name": "safety-stop",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/turns",
+      "status": 200,
+      "request": {
+        "turnIndex": 1,
+        "answerSource": "free_text",
+        "answerText": "My partner hit me."
+      },
+      "response": {
+        "type": "safety_stop",
+        "hotlines": [
+          {
+            "name": "US emergency services",
+            "phone": "911"
+          },
+          {
+            "name": "988 Suicide & Crisis Lifeline",
+            "phone": "988"
+          },
+          {
+            "name": "National Domestic Violence Hotline",
+            "phone": "1-800-799-7233"
+          }
+        ]
+      }
+    },
+    {
+      "name": "backtrack",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/back",
+      "status": 200,
+      "request": {
+        "turnIndex": 0
+      },
+      "response": {
+        "sessionId": "session_a_demo",
+        "status": "in_progress",
+        "tier": "free_short",
+        "stage": "thermometer_start",
+        "turns": [],
+        "currentTurn": {
+          "type": "next_turn",
+          "stage": "thermometer_start",
+          "turnIndex": 0,
+          "agentQuestion": "How upset are you right now, from 1 to 10?",
+          "optionLeft": "3",
+          "optionRight": "8",
+          "progressStageIndex": null,
+          "turnsUsed": 0,
+          "turnsMax": 4
+        },
+        "thermometerStart": null,
+        "thermometerEnd": null,
+        "createdAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "skip-topic",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/skip-topic",
+      "status": 200,
+      "request": {},
+      "response": {
+        "sessionId": "session_a_demo",
+        "status": "skipped",
+        "tier": "free_short",
+        "stage": "thermometer_start",
+        "turns": [],
+        "currentTurn": null,
+        "thermometerStart": null,
+        "thermometerEnd": null,
+        "createdAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "completed-reload",
+      "method": "GET",
+      "path": "/api/v1/fight-sessions/session_a_demo",
+      "status": 200,
+      "response": {
+        "sessionId": "session_a_demo",
+        "status": "completed",
+        "tier": "full",
+        "stage": "ready",
+        "turns": [],
+        "currentTurn": {
+          "type": "completed",
+          "resultUrl": "/api/v1/fight-sessions/session_a_demo/result"
+        },
+        "thermometerStart": 8,
+        "thermometerEnd": 3,
+        "createdAt": "2026-11-15T04:00:00Z"
+      }
+    },
+    {
+      "name": "private-result",
+      "method": "GET",
+      "path": "/api/v1/fight-sessions/session_a_demo/result",
+      "status": 200,
+      "response": {
+        "sessionId": "session_a_demo",
+        "neutralTopic": "chores",
+        "feltText": "I felt alone and wanted to feel that we were a team.",
+        "needText": "I needed us to agree on one practical next step.",
+        "openingLine": "I want us to feel like a team. Could we agree on one small thing to do differently?",
+        "sharedRules": [
+          "Speak about your own feelings and make one clear request.",
+          "Let each person finish, then check that you understood.",
+          "Either person can ask for a pause and agree when to return."
+        ],
+        "partnerStatus": "ready",
+        "thermometerStart": 8,
+        "thermometerEnd": 3,
+        "tier": "full",
+        "locked": []
+      }
+    },
+    {
+      "name": "teaser-preview",
+      "method": "GET",
+      "path": "/api/v1/fight-sessions/session_a_demo/result",
+      "status": 200,
+      "response": {
+        "sessionId": "session_a_demo",
+        "neutralTopic": "chores",
+        "feltText": "I felt alone and wanted to feel that we were a team.",
+        "needText": "I needed us to agree on one practical next step.",
+        "openingLine": "",
+        "sharedRules": [
+          "Speak about your own feelings and make one clear request.",
+          "Let each person finish, then check that you understood.",
+          "Either person can ask for a pause and agree when to return."
+        ],
+        "partnerStatus": "not_invited",
+        "thermometerStart": 8,
+        "thermometerEnd": null,
+        "tier": "free_short",
+        "locked": [
+          "openingLine",
+          "inviteUrl"
+        ]
+      }
+    },
+    {
+      "name": "checkout-create",
+      "method": "POST",
+      "path": "/api/v1/subscriptions/checkout",
+      "status": 201,
+      "request": {
+        "plan": "yearly"
+      },
+      "response": {
+        "checkoutUrl": "http://localhost:5173/checkout/success?session_id=cs_mock_example&demo=true",
+        "checkoutSessionId": "cs_mock_example"
+      }
+    },
+    {
+      "name": "pending-checkout-retry",
+      "method": "POST",
+      "path": "/api/v1/subscriptions/checkout",
+      "status": 201,
+      "request": {
+        "plan": "yearly"
+      },
+      "response": {
+        "checkoutUrl": "http://localhost:5173/checkout/success?session_id=cs_mock_example&demo=true",
+        "checkoutSessionId": "cs_mock_example"
+      }
+    },
+    {
+      "name": "pending-plan-conflict",
+      "method": "POST",
+      "path": "/api/v1/subscriptions/checkout",
+      "status": 409,
+      "response": {
+        "code": "conflict",
+        "message": "A checkout for another plan is already pending."
+      }
+    },
+    {
+      "name": "checkout-confirm",
+      "method": "POST",
+      "path": "/api/v1/subscriptions/confirm",
+      "status": 200,
+      "request": {
+        "checkoutSessionId": "cs_mock_example"
+      },
+      "response": {
+        "plan": "yearly",
+        "status": "active",
+        "activatedAt": "2026-11-15T04:03:00Z"
+      }
+    },
+    {
+      "name": "subscription-active",
+      "method": "GET",
+      "path": "/api/v1/subscriptions/me",
+      "status": 200,
+      "response": {
+        "plan": "yearly",
+        "status": "active",
+        "activatedAt": "2026-11-15T04:03:00Z"
+      }
+    },
+    {
+      "name": "subscription-none",
+      "method": "GET",
+      "path": "/api/v1/subscriptions/me",
+      "status": 200,
+      "response": {
+        "plan": "yearly",
+        "status": "none",
+        "activatedAt": null
+      }
+    },
+    {
+      "name": "rating",
+      "method": "POST",
+      "path": "/api/v1/journal/round_demo/rating",
+      "status": 200,
+      "request": {
+        "rating": 5
+      },
+      "response": {
+        "id": "round_demo",
+        "topic": "chores",
+        "startedAt": "2026-11-15T04:00:00Z",
+        "bothReadyAt": "2026-11-15T04:10:00Z",
+        "ratingA": 9,
+        "ratingB": 5,
+        "averageRating": 7,
+        "color": "yellow",
+        "status": "rated",
+        "divergenceFlag": true
+      }
+    },
+    {
+      "name": "rating-not-discussed",
+      "method": "POST",
+      "path": "/api/v1/journal/round_demo/rating",
+      "status": 200,
+      "request": {
+        "rating": null
+      },
+      "response": {
+        "id": "round_demo",
+        "topic": "chores",
+        "startedAt": "2026-11-15T04:00:00Z",
+        "bothReadyAt": "2026-11-15T04:10:00Z",
+        "ratingA": 9,
+        "ratingB": null,
+        "averageRating": null,
+        "color": "gray",
+        "status": "not_discussed",
+        "divergenceFlag": false
+      }
+    },
+    {
+      "name": "rating-waiting-for-partner",
+      "method": "POST",
+      "path": "/api/v1/journal/round_demo/rating",
+      "status": 200,
+      "request": {
+        "rating": 9
+      },
+      "response": {
+        "id": "round_demo",
+        "topic": "chores",
+        "startedAt": "2026-11-15T04:00:00Z",
+        "bothReadyAt": "2026-11-15T04:10:00Z",
+        "ratingA": 9,
+        "ratingB": null,
+        "averageRating": null,
+        "color": "gray",
+        "status": "pending",
+        "divergenceFlag": false
+      }
+    },
+    {
+      "name": "journal",
+      "method": "GET",
+      "path": "/api/v1/journal",
+      "status": 200,
+      "response": [
+        {
+          "id": "round_demo",
+          "topic": "chores",
+          "startedAt": "2026-11-15T04:00:00Z",
+          "bothReadyAt": "2026-11-15T04:10:00Z",
+          "ratingA": 9,
+          "ratingB": 5,
+          "averageRating": 7,
+          "color": "yellow",
+          "status": "rated",
+          "divergenceFlag": true
+        }
+      ]
+    },
+    {
+      "name": "journal-empty",
+      "method": "GET",
+      "path": "/api/v1/journal",
+      "status": 200,
+      "response": []
+    },
+    {
+      "name": "journal-stats",
+      "method": "GET",
+      "path": "/api/v1/journal/stats",
+      "status": 200,
+      "response": {
+        "totalFights": 1,
+        "topicCounts": {
+          "chores": 1
+        },
+        "averageRatingTrend": [
+          7
+        ],
+        "avgTimeToBothReadySeconds": 600,
+        "recurringTopicHint": null
+      }
+    },
+    {
+      "name": "journal-stats-empty",
+      "method": "GET",
+      "path": "/api/v1/journal/stats",
+      "status": 200,
+      "response": {
+        "totalFights": 0,
+        "topicCounts": {},
+        "averageRatingTrend": [],
+        "avgTimeToBothReadySeconds": 0,
+        "recurringTopicHint": null
+      }
+    },
+    {
+      "name": "validation-error",
+      "method": "POST",
+      "path": "/api/v1/couples",
+      "status": 400,
+      "response": {
+        "code": "validation_error",
+        "message": "Choose a valid age range."
+      }
+    },
+    {
+      "name": "unauthorized",
+      "method": "GET",
+      "path": "/api/v1/couples/me",
+      "status": 401,
+      "response": {
+        "code": "unauthorized",
+        "message": "A valid session is required."
+      }
+    },
+    {
+      "name": "forbidden",
+      "method": "POST",
+      "path": "/api/v1/subscriptions/checkout",
+      "status": 403,
+      "response": {
+        "code": "forbidden",
+        "message": "The initiating partner manages the couple subscription."
+      }
+    },
+    {
+      "name": "not-found",
+      "method": "GET",
+      "path": "/api/v1/fight-sessions/foreign-session",
+      "status": 404,
+      "response": {
+        "code": "not_found",
+        "message": "Resource not found."
+      }
+    },
+    {
+      "name": "stale-turn",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/turns",
+      "status": 409,
+      "response": {
+        "code": "conflict",
+        "message": "The submitted turn is not current."
+      }
+    },
+    {
+      "name": "journal-locked",
+      "method": "GET",
+      "path": "/api/v1/journal",
+      "status": 402,
+      "response": {
+        "code": "payment_required",
+        "message": "Unlock the full session to access the journal."
+      }
+    },
+    {
+      "name": "payment-unconfirmed",
+      "method": "POST",
+      "path": "/api/v1/subscriptions/confirm",
+      "status": 409,
+      "response": {
+        "code": "payment_unconfirmed",
+        "message": "Checkout has not been verified as paid."
+      }
+    },
+    {
+      "name": "payment-provider-unavailable",
+      "method": "POST",
+      "path": "/api/v1/subscriptions/checkout",
+      "status": 502,
+      "response": {
+        "code": "payment_unavailable",
+        "message": "Checkout is temporarily unavailable."
+      }
+    },
+    {
+      "name": "generation-unavailable",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/turns",
+      "status": 503,
+      "response": {
+        "code": "generation_unavailable",
+        "message": "The next step could not be prepared. Please try again."
+      }
+    }
+  ]
+}

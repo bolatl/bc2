@@ -1,0 +1,1901 @@
+openapi: 3.1.0
+info:
+  title: Love Lab Backend MVP
+  version: 1.0.0
+  description: Anonymous two-partner conversation practice. Backend prompt is the primary requirement source. No real payment
+    collection in this MVP.
+servers:
+- url: http://localhost:8080
+security:
+- anonymousSession: []
+paths:
+  /api/v1/couples:
+    post:
+      operationId: createCouple
+      summary: Create couple and role-A cookie
+      tags:
+      - couples
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoupleResponse'
+          headers:
+            Set-Cookie:
+              description: Signed anonymous role cookie, or expiry when deleting.
+              schema:
+                type: string
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCoupleRequest'
+  /api/v1/couples/me:
+    get:
+      operationId: getCouple
+      summary: Read current couple status
+      tags:
+      - couples
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoupleResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteCouple
+      summary: Delete all couple data and clear cookie
+      tags:
+      - couples
+      responses:
+        '204':
+          description: Success.
+          headers:
+            Set-Cookie:
+              description: Signed anonymous role cookie, or expiry when deleting.
+              schema:
+                type: string
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/invites/{inviteToken}:
+    get:
+      operationId: previewInvite
+      summary: Preview an enabled invitation
+      tags:
+      - invites
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+      parameters:
+      - name: inviteToken
+        in: path
+        required: true
+        schema: &id001
+          type: string
+          description: Opaque server-generated identifier. Do not infer order or encode user data.
+          minLength: 1
+  /api/v1/invites/{inviteToken}/join:
+    post:
+      operationId: joinInvite
+      summary: Join as partner B and set role-B cookie
+      tags:
+      - invites
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinInviteResponse'
+          headers:
+            Set-Cookie:
+              description: Signed anonymous role cookie, or expiry when deleting.
+              schema:
+                type: string
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JoinInviteRequest'
+      parameters:
+      - name: inviteToken
+        in: path
+        required: true
+        schema: *id001
+  /api/v1/personality-tests:
+    post:
+      operationId: submitPersonality
+      summary: Score and save own personality test
+      tags:
+      - personality-tests
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonalityTestResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitPersonalityTestRequest'
+  /api/v1/personality-tests/me:
+    get:
+      operationId: getPersonality
+      summary: Read own personality result
+      tags:
+      - personality-tests
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonalityTestResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/fight-sessions:
+    post:
+      operationId: createFightSession
+      summary: Start a private session in the current round
+      tags:
+      - fight-sessions
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FightSessionResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Active payment is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Next session step or result could not be generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyRequest'
+  /api/v1/fight-sessions/{sessionId}:
+    get:
+      operationId: getFightSession
+      summary: Reload private session state and surviving history
+      tags:
+      - fight-sessions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FightSessionResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: *id001
+  /api/v1/fight-sessions/{sessionId}/turns:
+    post:
+      operationId: submitTurn
+      summary: Answer one current question
+      tags:
+      - fight-sessions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Next session step or result could not be generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTurnRequest'
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: *id001
+  /api/v1/fight-sessions/{sessionId}/back:
+    post:
+      operationId: backtrackSession
+      summary: Reopen a previously answered question
+      tags:
+      - fight-sessions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FightSessionResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Next session step or result could not be generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackRequest'
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: *id001
+  /api/v1/fight-sessions/{sessionId}/skip-topic:
+    post:
+      operationId: skipTopic
+      summary: Stop this private session and erase raw history
+      tags:
+      - fight-sessions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FightSessionResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyRequest'
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: *id001
+  /api/v1/fight-sessions/{sessionId}/result:
+    get:
+      operationId: getFightResult
+      summary: Read own preview or completed result
+      tags:
+      - fight-sessions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FightSessionResultResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: *id001
+  /api/v1/subscriptions/checkout:
+    post:
+      operationId: createCheckout
+      summary: Create a checkout for the couple
+      tags:
+      - subscriptions
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateCheckoutResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Payment checkout provider unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCheckoutRequest'
+  /api/v1/subscriptions/confirm:
+    post:
+      operationId: confirmCheckout
+      summary: Verify payment and activate couple access
+      tags:
+      - subscriptions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmCheckoutRequest'
+  /api/v1/subscriptions/me:
+    get:
+      operationId: getSubscription
+      summary: Read current subscription or none state
+      tags:
+      - subscriptions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/journal/{fightRecordId}/rating:
+    post:
+      operationId: submitRating
+      summary: Save current partner rating or not-discussed choice
+      tags:
+      - journal
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FightRecordResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Active payment is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitRatingRequest'
+      parameters:
+      - name: fightRecordId
+        in: path
+        required: true
+        schema: *id001
+  /api/v1/journal:
+    get:
+      operationId: listJournal
+      summary: Read shared completed-round records
+      tags:
+      - journal
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Active payment is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/journal/stats:
+    get:
+      operationId: getJournalStats
+      summary: Read aggregates over shared records
+      tags:
+      - journal
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalStatsResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Active payment is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    anonymousSession:
+      type: apiKey
+      in: cookie
+      name: lovelab_session
+      description: HttpOnly HMAC-signed cookie binding couple and role; never construct it in frontend code.
+  schemas:
+    Age:
+      type: string
+      enum:
+      - 25-29
+      - 30-34
+      - 35-39
+      - 40-45
+      - other
+    RelationshipStatus:
+      type: string
+      enum:
+      - dating
+      - living_together
+      - engaged
+      - married
+    TogetherDuration:
+      type: string
+      enum:
+      - <1
+      - 1-3
+      - 3-7
+      - 7+
+    HasKids:
+      type: string
+      enum:
+      - 'no'
+      - expecting
+      - 'yes'
+    ConflictStyle:
+      type: string
+      enum:
+      - talk_now
+      - need_space
+      - get_loud
+      - shut_down
+    RepairNeed:
+      type: string
+      enum:
+      - being_heard
+      - apology
+      - plan
+      - closeness
+      - alone_time
+    FightTopic:
+      type: string
+      enum:
+      - money
+      - chores
+      - family
+      - time_attention
+      - phone
+      - jealousy
+      - closeness
+      - plans_decisions
+      - kids
+      - other
+    Goal:
+      type: string
+      enum:
+      - fewer_fights
+      - understand_each_other
+      - prepare_marriage
+      - feel_close
+    PartnerRole:
+      type: string
+      enum:
+      - A
+      - B
+    PartnerBStatus:
+      type: string
+      enum:
+      - not_invited
+      - invited
+      - in_progress
+      - ready
+    FightStage:
+      type: string
+      enum:
+      - thermometer_start
+      - facts
+      - feelings
+      - needs
+      - partner_view
+      - rehearsal
+      - thermometer_end
+      - ready
+    AnswerSource:
+      type: string
+      enum:
+      - card_left
+      - card_right
+      - free_text
+    Plan:
+      type: string
+      enum:
+      - monthly
+      - yearly
+      - program
+    SubscriptionStatus:
+      type: string
+      enum:
+      - none
+      - pending
+      - active
+    RatingColor:
+      type: string
+      enum:
+      - green
+      - yellow
+      - red
+      - gray
+    PersonalityLevel:
+      type: string
+      enum:
+      - low
+      - mid
+      - high
+    SessionTier:
+      type: string
+      enum:
+      - free_short
+      - full
+    SessionStatus:
+      type: string
+      enum:
+      - in_progress
+      - awaiting_payment
+      - completed
+      - stopped_safety
+      - skipped
+    RecordStatus:
+      type: string
+      enum:
+      - pending
+      - rated
+      - not_discussed
+    CreateCoupleRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - age
+      - relationshipStatus
+      - togetherDuration
+      - hasKids
+      - conflictStyle
+      - repairNeed
+      - fightTopics
+      - goal
+      properties:
+        age:
+          $ref: '#/components/schemas/Age'
+        relationshipStatus:
+          $ref: '#/components/schemas/RelationshipStatus'
+        togetherDuration:
+          $ref: '#/components/schemas/TogetherDuration'
+        hasKids:
+          $ref: '#/components/schemas/HasKids'
+        conflictStyle:
+          $ref: '#/components/schemas/ConflictStyle'
+        repairNeed:
+          $ref: '#/components/schemas/RepairNeed'
+        fightTopics:
+          type: array
+          items:
+            $ref: '#/components/schemas/FightTopic'
+          description: One to three distinct topics.
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+        goal:
+          $ref: '#/components/schemas/Goal'
+    JoinInviteRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - age
+      - conflictStyle
+      - repairNeed
+      properties:
+        age:
+          $ref: '#/components/schemas/Age'
+        conflictStyle:
+          $ref: '#/components/schemas/ConflictStyle'
+        repairNeed:
+          $ref: '#/components/schemas/RepairNeed'
+    SubscriptionResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - plan
+      - status
+      - activatedAt
+      properties:
+        plan:
+          $ref: '#/components/schemas/Plan'
+        status:
+          $ref: '#/components/schemas/SubscriptionStatus'
+        activatedAt:
+          type:
+          - string
+          - 'null'
+          description: RFC 3339 timestamp in UTC.
+          format: date-time
+    CoupleResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - coupleId
+      - inviteUrl
+      - partnerBStatus
+      - partnerBInviteSentAt
+      - defaultPlan
+      - subscription
+      - personalityDone
+      - createdAt
+      properties:
+        coupleId: *id001
+        inviteUrl:
+          type: string
+          description: Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A.
+        partnerBStatus:
+          $ref: '#/components/schemas/PartnerBStatus'
+        partnerBInviteSentAt:
+          type:
+          - string
+          - 'null'
+          description: Time invitation became shareable in the current round; null before readiness; not delivery confirmation.
+          format: date-time
+        defaultPlan:
+          $ref: '#/components/schemas/Plan'
+        subscription:
+          anyOf:
+          - $ref: '#/components/schemas/SubscriptionResponse'
+          - type: 'null'
+        personalityDone:
+          type: boolean
+          description: Whether the current role has completed the personality test.
+        createdAt: &id002
+          type: string
+          description: RFC 3339 timestamp in UTC.
+          format: date-time
+    InviteResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - neutralTopic
+      - message
+      properties:
+        neutralTopic:
+          anyOf:
+          - $ref: '#/components/schemas/FightTopic'
+          - type: 'null'
+        message:
+          type: string
+          description: Neutral invitation text without A’s private data.
+    JoinInviteResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - coupleId
+      - partnerRole
+      - neutralTopic
+      properties:
+        coupleId: *id001
+        partnerRole:
+          type: string
+          const: B
+        neutralTopic:
+          anyOf:
+          - $ref: '#/components/schemas/FightTopic'
+          - type: 'null'
+    SubmitPersonalityTestRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - answers
+      properties:
+        answers:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 5
+          description: Mini-IPIP answers in the specified 1–20 item order.
+          minItems: 20
+          maxItems: 20
+    TraitResult:
+      type: object
+      additionalProperties: false
+      required:
+      - score
+      - level
+      properties:
+        score:
+          type: integer
+          description: Sum of four direction-corrected item scores.
+          minimum: 4
+          maximum: 20
+        level:
+          $ref: '#/components/schemas/PersonalityLevel'
+    Traits:
+      type: object
+      additionalProperties: false
+      required:
+      - e
+      - a
+      - c
+      - n
+      - i
+      properties:
+        e:
+          $ref: '#/components/schemas/TraitResult'
+        a:
+          $ref: '#/components/schemas/TraitResult'
+        c:
+          $ref: '#/components/schemas/TraitResult'
+        n:
+          $ref: '#/components/schemas/TraitResult'
+        i:
+          $ref: '#/components/schemas/TraitResult'
+    PersonalityTestResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - traits
+      - strengths
+      - tips
+      - completedAt
+      properties:
+        traits:
+          $ref: '#/components/schemas/Traits'
+        strengths:
+          type: array
+          items:
+            type: string
+          description: Three plain-language strengths.
+          minItems: 3
+          maxItems: 3
+        tips:
+          type: array
+          items:
+            type: string
+          description: Two plain-language tips.
+          minItems: 2
+          maxItems: 2
+        completedAt: *id002
+    SubmitTurnRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - turnIndex
+      - answerSource
+      properties:
+        turnIndex:
+          type: integer
+          description: Current zero-based index; stale or duplicate indexes cause conflict.
+          minimum: 0
+        answerSource:
+          $ref: '#/components/schemas/AnswerSource'
+        answerText:
+          type: string
+          description: Required for free_text. For cards use the exact displayed card text or omit it; server resolves the
+            stored card.
+          maxLength: 4000
+      allOf:
+      - if:
+          properties:
+            answerSource:
+              const: free_text
+        then:
+          required:
+          - answerText
+          properties:
+            answerText:
+              minLength: 1
+              pattern: \S
+    BackRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - turnIndex
+      properties:
+        turnIndex:
+          type: integer
+          description: Previously answered index to reopen. Its answer and all later history are erased.
+          minimum: 0
+    NextTurnResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - stage
+      - turnIndex
+      - agentQuestion
+      - optionLeft
+      - optionRight
+      - progressStageIndex
+      - turnsUsed
+      - turnsMax
+      properties:
+        type:
+          type: string
+          const: next_turn
+        stage:
+          $ref: '#/components/schemas/FightStage'
+        turnIndex:
+          type: integer
+          minimum: 0
+        agentQuestion:
+          type: string
+          description: Question for the owner of this session.
+        optionLeft:
+          type: string
+          description: First answer card.
+        optionRight:
+          type: string
+          description: Second answer card.
+        progressStageIndex:
+          type:
+          - integer
+          - 'null'
+          description: 'Stage progress: facts=1, feelings=2, needs=3, partner_view=4, rehearsal=5, ready=6; null on thermometers.'
+          minimum: 1
+          maximum: 6
+        turnsUsed:
+          type: integer
+          description: Number of answers accepted in the current branch.
+          minimum: 0
+        turnsMax:
+          type: integer
+          description: 'Current budget: FREE_TURNS (3 or 4) for teaser, MAX_TURNS (7–12) for full.'
+          minimum: 3
+          maximum: 12
+    PlanOption:
+      type: object
+      additionalProperties: false
+      required:
+      - plan
+      - priceUsd
+      - isDefault
+      properties:
+        plan:
+          $ref: '#/components/schemas/Plan'
+        priceUsd:
+          type: number
+          description: Displayed per-plan USD price.
+          minimum: 0
+        isDefault:
+          type: boolean
+          description: Selected by relationship status, not an imposed purchase.
+    PaywallResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - availablePlans
+      properties:
+        type:
+          type: string
+          const: paywall_required
+        availablePlans:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanOption'
+          minItems: 3
+          maxItems: 3
+    Hotline:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - phone
+      properties:
+        name:
+          type: string
+          description: Name and locale of the support resource.
+        phone:
+          type: string
+          description: Display/dial string; never interpret it as a numeric value.
+    SafetyStopResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - hotlines
+      properties:
+        type:
+          type: string
+          const: safety_stop
+        hotlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/Hotline'
+          minItems: 1
+    CompletedResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - resultUrl
+      properties:
+        type:
+          type: string
+          const: completed
+        resultUrl:
+          type: string
+          description: API path to the private session result.
+    TurnResponse:
+      oneOf:
+      - $ref: '#/components/schemas/NextTurnResponse'
+      - $ref: '#/components/schemas/PaywallResponse'
+      - $ref: '#/components/schemas/SafetyStopResponse'
+      - $ref: '#/components/schemas/CompletedResponse'
+      discriminator:
+        propertyName: type
+        mapping:
+          next_turn: '#/components/schemas/NextTurnResponse'
+          paywall_required: '#/components/schemas/PaywallResponse'
+          safety_stop: '#/components/schemas/SafetyStopResponse'
+          completed: '#/components/schemas/CompletedResponse'
+    FightTurn:
+      type: object
+      additionalProperties: false
+      required:
+      - turnIndex
+      - stage
+      - agentQuestion
+      - optionLeft
+      - optionRight
+      - answerSource
+      - answerText
+      properties:
+        turnIndex:
+          type: integer
+          minimum: 0
+        stage:
+          $ref: '#/components/schemas/FightStage'
+        agentQuestion:
+          type: string
+        optionLeft:
+          type: string
+        optionRight:
+          type: string
+        answerSource:
+          $ref: '#/components/schemas/AnswerSource'
+        answerText:
+          type: string
+    FightSessionResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - sessionId
+      - status
+      - tier
+      - stage
+      - turns
+      - currentTurn
+      - thermometerStart
+      - thermometerEnd
+      - createdAt
+      properties:
+        sessionId: *id001
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        tier:
+          $ref: '#/components/schemas/SessionTier'
+        stage:
+          $ref: '#/components/schemas/FightStage'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/FightTurn'
+          description: Answered history for this owner only; empty after terminal cleanup.
+        currentTurn:
+          anyOf:
+          - $ref: '#/components/schemas/TurnResponse'
+          - type: 'null'
+        thermometerStart:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+        thermometerEnd:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+        createdAt: *id002
+      allOf:
+      - if:
+          properties:
+            status:
+              const: in_progress
+        then:
+          properties:
+            currentTurn:
+              $ref: '#/components/schemas/NextTurnResponse'
+      - if:
+          properties:
+            status:
+              const: awaiting_payment
+        then:
+          properties:
+            currentTurn:
+              $ref: '#/components/schemas/PaywallResponse'
+      - if:
+          properties:
+            status:
+              const: completed
+        then:
+          properties:
+            currentTurn:
+              $ref: '#/components/schemas/CompletedResponse'
+            turns:
+              maxItems: 0
+      - if:
+          properties:
+            status:
+              const: stopped_safety
+        then:
+          properties:
+            currentTurn:
+              $ref: '#/components/schemas/SafetyStopResponse'
+            turns:
+              maxItems: 0
+      - if:
+          properties:
+            status:
+              const: skipped
+        then:
+          properties:
+            currentTurn:
+              type: 'null'
+            turns:
+              maxItems: 0
+    FightSessionResultResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - sessionId
+      - neutralTopic
+      - feltText
+      - needText
+      - openingLine
+      - sharedRules
+      - partnerStatus
+      - thermometerStart
+      - thermometerEnd
+      - tier
+      - locked
+      properties:
+        sessionId: *id001
+        neutralTopic:
+          $ref: '#/components/schemas/FightTopic'
+        feltText:
+          type: string
+          description: Private derived feeling summary.
+        needText:
+          type: string
+          description: Private derived need summary.
+        openingLine:
+          type: string
+          description: Private first sentence; empty while locked.
+        sharedRules:
+          type: array
+          items:
+            type: string
+          description: The same three neutral conversation rules.
+          minItems: 3
+          maxItems: 3
+        partnerStatus:
+          $ref: '#/components/schemas/PartnerBStatus'
+        thermometerStart:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+        thermometerEnd:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+        tier:
+          $ref: '#/components/schemas/SessionTier'
+        locked:
+          type: array
+          items:
+            type: string
+            enum:
+            - openingLine
+            - inviteUrl
+          description: Empty when full access is available.
+          uniqueItems: true
+    CreateCheckoutRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - plan
+      properties:
+        plan:
+          $ref: '#/components/schemas/Plan'
+    CreateCheckoutResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - checkoutUrl
+      - checkoutSessionId
+      properties:
+        checkoutUrl:
+          type: string
+          description: Absolute Stripe test checkout URL, or clearly marked frontend demo checkout URL. Do not infer payment
+            success from this URL.
+        checkoutSessionId: *id001
+    ConfirmCheckoutRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - checkoutSessionId
+      properties:
+        checkoutSessionId: *id001
+    SubmitRatingRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - rating
+      properties:
+        rating:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+    FightRecordResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - topic
+      - startedAt
+      - bothReadyAt
+      - ratingA
+      - ratingB
+      - averageRating
+      - color
+      - status
+      - divergenceFlag
+      properties:
+        id: *id001
+        topic:
+          $ref: '#/components/schemas/FightTopic'
+        startedAt: *id002
+        bothReadyAt:
+          type:
+          - string
+          - 'null'
+          description: RFC 3339 timestamp in UTC.
+          format: date-time
+        ratingA:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+        ratingB:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+        averageRating:
+          type:
+          - number
+          - 'null'
+          description: Mean of both numeric ratings; absent average is null.
+          minimum: 1
+          maximum: 10
+        color:
+          $ref: '#/components/schemas/RatingColor'
+        status:
+          $ref: '#/components/schemas/RecordStatus'
+        divergenceFlag:
+          type: boolean
+          description: True only with two numeric ratings whose difference reaches the configured threshold (default 4).
+    JournalResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/FightRecordResponse'
+      description: Shared records oldest first (ID breaks equal timestamps); [] when empty.
+    JournalStatsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - totalFights
+      - topicCounts
+      - averageRatingTrend
+      - avgTimeToBothReadySeconds
+      - recurringTopicHint
+      properties:
+        totalFights:
+          type: integer
+          minimum: 0
+        topicCounts:
+          type: object
+          propertyNames:
+            $ref: '#/components/schemas/FightTopic'
+          additionalProperties:
+            type: integer
+            minimum: 1
+          description: Only topics present in the journal; {} when empty.
+        averageRatingTrend:
+          type: array
+          items:
+            type: number
+            minimum: 1
+            maximum: 10
+          description: Available two-person averages in chronological order.
+        avgTimeToBothReadySeconds:
+          type: integer
+          description: Mean elapsed seconds, truncated to integer; zero when there are no records.
+          minimum: 0
+        recurringTopicHint:
+          anyOf:
+          - $ref: '#/components/schemas/FightTopic'
+          - type: 'null'
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+        message:
+          type: string
+          description: User-readable explanation; do not branch on its wording.
+    EmptyRequest:
+      type: object
+      additionalProperties: false
+      required: []
+      properties: {}

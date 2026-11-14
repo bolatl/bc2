@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+/bin/
+/coverage.out
+*.test
+__pycache__/
+
+# Local source material; generated documentation and project skills stay tracked.
+/LoveLab_BACKEND_PROMPT.md
+/LoveLab_FINAL.md
+/LoveLab_dev_flow_v0.md
+/LoveLab_PRODUCT_BRIEF.md
+/SKILL.md
+/Business_Cup_2.0_Brief.pdf
