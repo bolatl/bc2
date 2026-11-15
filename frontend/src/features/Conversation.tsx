@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Copy, HeartHandshake, LockKeyhole, MessageCircle, MessageSquareText, Phone, RefreshCw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Copy, HeartHandshake, LockKeyhole, MessageCircle, MessageSquareText, Mic, MicOff, Phone, RefreshCw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
 import { api, ApiError } from '../api/client';
 import type { Checkout, Couple, Fight, PlanOption, Result, Subscription, TurnResponse } from '../api/types';
 import { useSession } from '../app/session';
@@ -9,6 +9,7 @@ import { LockedPreview } from '../components/LockedPreview';
 import { ConversationReflection } from '../components/ConversationReflection';
 import { SakuraJourney } from '../components/SakuraJourney';
 import { config } from '../config';
+import { useSpeechToText } from '../hooks/useSpeechToText';
 import '../styles/conversation.css';
 
 // Keep in sync with MaxAnswerChars in internal/service/fight.go.
@@ -18,6 +19,8 @@ const stageTitles: Record<string, string> = {
   needs: 'What you need', partner_view: 'Another perspective', rehearsal: 'Try the words',
   thermometer_end: 'Check in with yourself', ready: 'Your next step',
 };
+// Joins dictated text onto what is already in the answer, with one space between chunks.
+const appendSpeech = (prev: string, text: string) => !prev ? text : /\s$/.test(prev) ? prev + text : `${prev} ${text}`;
 const topicLabel = (value: string) => value.replaceAll('_', ' ').replace(/^./, c => c.toUpperCase());
 
 function PreparationAside({ stage, turns, checkpoint = false }: { stage: string; turns: Fight['turns']; checkpoint?: boolean }) {
@@ -129,6 +132,7 @@ export function FightPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [needsCheck, setNeedsCheck] = useState(false);
   const [confirm, setConfirm] = useState<'back' | 'skip' | null>(null);
+  const speech = useSpeechToText(text => setDraft(prev => appendSpeech(prev, text)));
   const current = fight?.currentTurn;
   const question = current?.type === 'next_turn' ? current : null;
   const locked = operation.busy || needsCheck;
@@ -204,6 +208,7 @@ export function FightPage() {
 
   function answer(source: 'card_left' | 'card_right' | 'free_text', text?: string) {
     if (!question) return;
+    speech.cancel();
     void mutate('turns', { turnIndex: question.turnIndex, answerSource: source, ...(text === undefined ? {} : { answerText: text }) });
   }
 
@@ -243,7 +248,10 @@ export function FightPage() {
 
   const thermometer = question.stage === 'thermometer_start' || question.stage === 'thermometer_end';
   const number = question.progressStageIndex === null ? question.stage === 'thermometer_start' ? 'Before' : 'After' : String(question.progressStageIndex).padStart(2, '0');
-  const count = [...draft].length;
+  // Words still being dictated show in the textarea and are sent with the answer.
+  const answerText = speech.interim ? appendSpeech(draft, speech.interim) : draft;
+  const count = [...answerText].length;
+  const sendAnswer = () => { if (answerText.trim() && count <= maxAnswerChars) { setDraft(answerText); answer('free_text', answerText); } };
   return <Page transitionKey={fightStep(fight)} number={number} eyebrow={stageTitles[question.stage]} title={question.agentQuestion} className={`conversation-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} turns={fight.turns} />}>
     <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Your private preparation</span><span>{question.turnsUsed} / {question.turnsMax} answers</span></div>
     {question.stage === 'thermometer_start' && <ProcessingNote />}
@@ -254,10 +262,16 @@ export function FightPage() {
           <button className="option answer-card" disabled={locked} onClick={() => answer('card_left')}><span className="answer-card-icon" aria-hidden="true">{question.stage === 'ready' ? <MessageCircle size={23} /> : <span>A</span>}</span><span>{question.optionLeft}</span><ArrowRight size={18} aria-hidden="true" /></button>
           <button className="option answer-card" disabled={locked} onClick={() => answer('card_right')}><span className="answer-card-icon" aria-hidden="true">{question.stage === 'ready' ? <MessageSquareText size={23} /> : <span>B</span>}</span><span>{question.optionRight}</span><ArrowRight size={18} aria-hidden="true" /></button>
         </div>
-        {question.stage !== 'ready' && <form className="free-answer" onSubmit={e => { e.preventDefault(); if (draft.trim() && count <= maxAnswerChars) answer('free_text', draft); }}>
+        {question.stage !== 'ready' && <form className="free-answer" onSubmit={e => { e.preventDefault(); sendAnswer(); }}>
           <label htmlFor="own-answer">Or put it in your own words</label>
-          <textarea id="own-answer" value={draft} disabled={locked} rows={3} placeholder="What feels true for you?" aria-describedby="answer-count" onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (draft.trim() && count <= maxAnswerChars) answer('free_text', draft); } }} />
-          <div className="answer-footer"><span id="answer-count">{count} / {maxAnswerChars}<span className="keyboard-hint">Shift + Enter for a new line</span></span><Button disabled={!draft.trim() || count > maxAnswerChars || locked} type="submit">Continue <ArrowRight size={18} aria-hidden="true" /></Button></div>
+          <div className="voice-field">
+          <textarea id="own-answer" value={answerText} disabled={locked} rows={3} placeholder="What feels true for you?" aria-describedby="answer-count" onChange={e => { if (speech.isListening) speech.cancel(); setDraft(e.target.value); }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendAnswer(); } }} />
+            <span className="voice-button-wrap" title={speech.isSupported ? undefined : 'Voice input works in Chrome, Edge or Safari'}>
+              <button type="button" className={`voice-button${speech.isListening ? ' is-listening' : ''}`} disabled={!speech.isSupported || locked} onClick={speech.isListening ? speech.stop : speech.start} aria-label={!speech.isSupported ? 'Voice input works in Chrome, Edge or Safari' : speech.isListening ? 'Stop voice input' : 'Start voice input'} title={speech.isSupported ? speech.isListening ? 'Stop voice input' : 'Speak your answer' : undefined}>{speech.isListening ? <MicOff size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}</button>
+            </span>
+          </div>
+          <p className={`voice-status${speech.error && !speech.isListening ? ' is-error' : ''}`} role="status">{speech.isListening ? <><span className="voice-dot" aria-hidden="true" />Listening…</> : speech.error}</p>
+          <div className="answer-footer"><span id="answer-count">{count} / {maxAnswerChars}<span className="keyboard-hint">Shift + Enter for a new line</span></span><Button disabled={!answerText.trim() || count > maxAnswerChars || locked} type="submit">Continue <ArrowRight size={18} aria-hidden="true" /></Button></div>
           {count > maxAnswerChars && <p role="alert">Please keep your answer within {maxAnswerChars} characters.</p>}
         </form>}
       </>}
