@@ -72,6 +72,13 @@
 .prototype-paywall .plan { position: relative; padding: 22px 18px; }
 .prototype-plan-badge { position: absolute; top: -12px; right: 18px; background: var(--accent); color: var(--on-accent); padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: 600; }
 .prototype-paywall .plan-grid { gap: 19px; }
+.premium-plan { border: 1.5px solid var(--rule); border-radius: var(--radius-md); }
+.premium-plan.selected { border-color: var(--accent); background: var(--you-soft); }
+.prototype-paywall .premium-plan .plan { border: 0; background: transparent; box-shadow: none; }
+.plan-default { color: var(--you-ink); font-size: .8em; white-space: nowrap; }
+.pricing-total { display: flex; justify-content: space-between; gap: 16px; padding-top: 22px; margin-top: 22px; border-top: 1px solid var(--rule); font-size: 15px; }
+.pricing-total strong { color: var(--you-ink); font-variant-numeric: tabular-nums; }
+.prototype-paywall .plan-picker > .actions { margin-top: 20px; }
 .prototype-paywall .actions { flex-direction: column; align-items: stretch; }
 .prototype-paywall .actions > a { align-self: center; }
 .prototype-ready-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 25px; }
@@ -89,4 +96,9 @@
   .insight-card, .rehearsal-option, .prototype-paywall .plan-picker { padding: 23px; }
   .rehearsal-option blockquote { font-size: 22px; }
   .conversation-page .answer-card > span:not(.answer-card-icon) { font-size: 15px; }
+}
+@media (max-width: 420px) {
+  .prototype-paywall .plan { grid-template-columns: 20px minmax(0, 1fr); padding: 17px 12px; }
+  .prototype-paywall .plan-price { grid-column: 2; text-align: left; }
+  .prototype-paywall .plan-price small { display: inline; margin-left: 5px; }
 }

@@ -100,7 +100,7 @@ func (a *App) coupleResponse(c model.Couple, actor model.Actor) dto.CoupleRespon
 		out.InviteURL = a.Config.FrontendURL + "/invites/" + url.PathEscape(c.InviteToken)
 	}
 	if s, ok := a.Subscriptions.Get(c.ID); ok {
-		out.Subscription = &dto.SubscriptionResponse{Plan: s.Plan, Status: s.Status, ActivatedAt: s.ActivatedAt}
+		out.Subscription = &dto.SubscriptionResponse{Plan: s.Plan, Status: s.Status, ActivatedAt: s.ActivatedAt, AddOns: s.AddOns}
 	}
 	_, out.PersonalityDone = a.Personalities.Get(personalityKey(actor))
 	return out

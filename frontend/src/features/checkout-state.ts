@@ -21,13 +21,20 @@ export function clearCheckout() {
 }
 
 export const fallbackPlans: PlanOption[] = [
-  { plan: 'yearly', priceUsd: 99, isDefault: false },
-  { plan: 'program', priceUsd: 149, isDefault: false },
-  { plan: 'monthly', priceUsd: 14.99, isDefault: false },
+  { plan: 'yearly', priceUsd: 199, isDefault: true },
+  { plan: 'monthly', priceUsd: 19.99, isDefault: false },
+  { plan: 'date_night', priceUsd: 69, isDefault: false },
 ];
 
 export const planCopy: Record<string, { title: string; period: string; description: string }> = {
-  monthly: { title: 'Monthly', period: '/ month', description: 'One month for both of you' },
-  yearly: { title: 'Yearly', period: '/ year', description: '$8.25 per month, billed yearly' },
+  monthly: { title: 'Kintsugi', period: '/ month', description: 'One plan for two: $9.99 per person per month.' },
+  yearly: { title: 'Premium', period: '/ year', description: 'Date night, SOS mode, unlimited sessions.' },
+  date_night: { title: 'Date Night', period: 'one-time', description: 'A one-time purchase for both of you.' },
+  // Older paid accounts and already-open checkouts remain supported.
+  premium_monthly: { title: 'Premium', period: '/ month', description: 'Existing monthly Premium plan.' },
   program: { title: '8-week program', period: 'one-time', description: 'Eight weeks to prepare together' },
 };
+
+export function planPrice(plan: string, plans = fallbackPlans) {
+  return plans.find(option => option.plan === plan)?.priceUsd ?? (plan === 'program' ? 149 : plan === 'premium_monthly' ? 29.99 : 0);
+}

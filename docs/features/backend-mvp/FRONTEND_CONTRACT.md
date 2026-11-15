@@ -8,13 +8,29 @@ The browser onboarding uses four short steps for relationship/optional partner n
 
 Render by `currentTurn.type` / `TurnResponse.type`, not by guessed turn counts. Use `stage` to choose thermometer controls, and use `progressStageIndex` (null for thermometers) for stage progress. Submit the current zero-based `turnIndex`; disable duplicate sends while pending. Card clicks select an answer without submitting; **Next** sends the exact server option or omits `answerText`. Free text requires a nonempty value. Question prompts are bounded to 12 words and cards to eight words / 60 characters, with stacked cards and a separate free-text entry. `answerText` is limited to 300 Unicode code points, counted with `[...text].length` in JavaScript and rune counting in Go. Enforce the limit for both button and Enter submission; Shift+Enter may insert a newline. Thermometer free text is an integer string from `"1"` to `"10"`. The final `ready` question requires the user's explicit confirmation.
 
-At `paywall_required`, retain the session ID and show the three returned plans with their exact prices. The private result endpoint supplies the teaser insight with an empty locked opening line. A Stripe redirect is not proof of payment: POST the checkout ID to `/subscriptions/confirm`, handle unpaid/conflict errors, then reload the original session. The mock URL opens the labeled local `/checkout/demo` form as a native modal dialog, centered on desktop and a bottom sheet on mobile, over a dimmed plan summary. It prefills `Demo User`, `4242 4242 4242 4242`, December three years from the current year, and `123`. A reload restores those demo defaults, never previously typed card data. Accept only the test number `4242 4242 4242 4242`, a nonempty test name, a current or future expiry month in `MM/YY`, and a three-digit CVC. Validate those fields in browser memory only; never send or persist them. On explicit form submission, confirm using only the issued checkout ID. No bank charge or Stripe request occurs. Loading the demo checkout, reloading it, or returning from a canceled checkout must not activate a pending plan. A direct visit to `/checkout/success` with a pending mock ID returns to the form instead of confirming automatically.
+At `paywall_required`, retain the session ID and show the three mutually exclusive plans from `availablePlans` with their exact prices: Premium yearly, Kintsugi monthly, or Date Night as a standalone one-time purchase. Select exactly one; there is no add-on checkbox or combined total. The private result endpoint supplies the teaser insight with an empty locked opening line. A Stripe redirect is not proof of payment: POST the checkout ID to `/subscriptions/confirm`, handle unpaid/conflict errors, then reload the original session. The mock URL opens the labeled local `/checkout/demo` form as a native modal dialog, centered on desktop and a bottom sheet on mobile, over a dimmed plan summary. It prefills `Demo User`, `4242 4242 4242 4242`, December three years from the current year, and `123`. A reload restores those demo defaults, never previously typed card data. Accept only the test number `4242 4242 4242 4242`, a nonempty test name, a current or future expiry month in `MM/YY`, and a three-digit CVC. Validate those fields in browser memory only; never send or persist them. On explicit form submission, confirm using only the issued checkout ID. No bank charge or Stripe request occurs. Loading the demo checkout, reloading it, or returning from a canceled checkout must not activate a pending plan. A direct visit to `/checkout/success` with a pending mock ID returns to the form instead of confirming automatically.
 
 At `safety_stop`, replace the conversation with its private resource screen and discard local raw conversation text. Do not broadcast a partner event. At completed/skipped state, erase local answer history and use only the allowed derived result. Never put raw answers, private results, invitation tokens, or cookie values in analytics or console logs.
 
 Show an empty state for `[]` journal data, a missing-personality prompt for 404, an onboarding entry for 401, and plans for 402. A 409 stale turn should trigger a reload before another send. Render a checkout retry error for 502 or a generation retry error for 503 without advancing local state. Error messages are display text; use `code` and HTTP status for branching. Do not automatically retry a mutation without reconciling its current state.
 
 After both are ready, either partner can submit `{"rating": 8}` or `{"rating": null}` immediately. The null choice means “we have not talked”; omitting `rating` is invalid. `averageRating: null` must not render as zero. Poll `/couples/me` or the owner's `/result` for readiness; the backend sends no SMS or push notifications. `partnerBInviteSentAt` denotes current-round availability, not actual delivery. It resets when a new round begins.
+
+## Pricing and checkout
+
+| Plan key | Display name | Price |
+| --- | --- | --- |
+| `yearly` | Premium, default | $199/year |
+| `monthly` | Kintsugi, one plan for two | $19.99/month |
+| `date_night` | Date Night | $69 once |
+
+Premium yearly is the default for every relationship status. Premium has no monthly billing option for new purchases. Kintsugi's copy shows $9.99 per person per month; the payable couple total is $19.99. `availablePlans` contains exactly these three choices. Date Night is a standalone plan, so choosing it clears the other selection.
+
+For a new purchase, send one `plan` to `/subscriptions/checkout`. Display the returned `amountUsd` as that plan's price: $199, $19.99, or $69. Omit the deprecated `addOns` field; a nonempty array is rejected with HTTP 400. Do not send card fields or user-calculated prices. A repeated request for the same single-plan pending checkout returns the existing checkout; changing that plan conflicts. Restore its plan from `/subscriptions/me`, then request that exact plan to recover the checkout URL and price.
+
+An old combined pending checkout is a migration case: show the three choices again. Confirming the old combined checkout returns HTTP 409. Submitting a current plan without extras creates a fresh checkout; only after successful creation does the server replace the old pending record. The old ID then returns HTTP 404 on confirmation. A failed replacement leaves the old pending record available for another attempt. Previously paid access remains active for both partners and future conversations.
+
+The old `program` plan remains a legacy $149 purchase for existing access and single-plan pending-checkout recovery; `premium_monthly` also remains available only for existing access and single-plan pending-checkout recovery. Neither is offered for new purchases. Legacy `SubscriptionResponse.addOns` may describe prior combined purchases; it does not enable buying extras. Date Night and SOS descriptions on pricing cards do not introduce additional API operations or newly implemented activity flows.
 
 ## Navigation, owned history and repeat conversations
 
@@ -139,7 +155,10 @@ export type FightStage = "thermometer_start" | "facts" | "feelings" | "needs" | 
 
 export type AnswerSource = "card_left" | "card_right" | "free_text";
 
-export type Plan = "monthly" | "yearly" | "program";
+export type Plan = "monthly" | "yearly" | "date_night" | "premium_monthly" | "program";
+
+/** @deprecated Legacy combined-purchase marker only. */
+export type AddOn = "date_night";
 
 export type SubscriptionStatus = "none" | "pending" | "active";
 
@@ -177,6 +196,8 @@ export interface JoinInviteRequest {
 export interface SubscriptionResponse {
   plan: Plan;
   status: SubscriptionStatus;
+  /** @deprecated Legacy combined-purchase extras; omitted for all new purchases. */
+  addOns?: AddOn[];
   /** RFC 3339 timestamp in UTC. */
   activatedAt: string | null;
 }
@@ -210,7 +231,7 @@ export interface CoupleResponse {
   partnerBStatus: PartnerBStatus;
   /** Time invitation became shareable in the current round; null before readiness; not delivery confirmation. */
   partnerBInviteSentAt: string | null;
-  /** Program for engaged couples, yearly otherwise. */
+  /** Premium yearly for every relationship status; not an imposed purchase. */
   defaultPlan: Plan;
   /** Own profile only; omitted when not supplied. */
   partnerName?: string;
@@ -295,7 +316,7 @@ export interface PlanOption {
   plan: Plan;
   /** Displayed per-plan USD price. */
   priceUsd: number;
-  /** Selected by relationship status, not an imposed purchase. */
+  /** True for Premium yearly, regardless of relationship status. */
   isDefault: boolean;
 }
 
@@ -433,7 +454,10 @@ export interface ReflectionFacet {
 }
 
 export interface CreateCheckoutRequest {
+  /** New purchases select monthly, yearly, or date_night; other values only resume single-plan legacy pending checkouts. */
   plan: Plan;
+  /** @deprecated Omit or pass []; every nonempty array is rejected. */
+  addOns?: [];
 }
 
 export interface CreateCheckoutResponse {
@@ -441,6 +465,8 @@ export interface CreateCheckoutResponse {
   checkoutUrl: string;
   /** Opaque server-generated identifier. Do not infer order or encode user data. */
   checkoutSessionId: string;
+  /** Single-plan price, calculated by the server. */
+  amountUsd: number;
 }
 
 export interface ConfirmCheckoutRequest {

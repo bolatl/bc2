@@ -21,6 +21,7 @@
 .demo-sheet-handle { display: none; width: 64px; height: 5px; margin: 0 auto 22px; border-radius: 5px; background: var(--rule); }
 .demo-checkout-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--ink-muted); font-size: 14px; margin-bottom: 24px; }
 .demo-checkout-line strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.demo-checkout-line small { color: var(--ink-muted); font-size: 11px; }
 .demo-payment-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
 .demo-payment-heading h2 { margin: 0; font-size: 27px; }
 .demo-payment-heading h2:focus { outline: none; }

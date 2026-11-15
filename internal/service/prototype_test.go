@@ -15,7 +15,7 @@ func TestPrototypeOnboardingStoresOnlyProvidedProfileAndNamesStayPrivate(t *test
 	app := New(config.Default(), llm.NewMock(), payment.NewMock("http://localhost:5173"))
 	profile := model.PartnerProfile{PartnerName: "  Сэм  ", RelationshipStatus: "engaged", ConflictStyle: "need_space", RepairNeed: "closeness", Source: "friend"}
 	response, actor, err := app.CreateCouple(profile)
-	if err != nil || response.PartnerName != "Сэм" || response.DefaultPlan != "program" {
+	if err != nil || response.PartnerName != "Сэм" || response.DefaultPlan != "yearly" {
 		t.Fatalf("minimal profile: %+v, %v", response, err)
 	}
 	stored, _ := app.Couples.Get(actor.CoupleID)
@@ -64,9 +64,6 @@ func TestPrototypeOnboardingRejectsInvalidProvidedFields(t *testing.T) {
 func TestPrototypeRecommendedPlan(t *testing.T) {
 	for _, status := range []string{"dating", "living_together", "married", "engaged"} {
 		want := "yearly"
-		if status == "engaged" {
-			want = "program"
-		}
 		if got := defaultPlan(model.Couple{ProfileA: model.PartnerProfile{RelationshipStatus: status}}); got != want {
 			t.Errorf("default plan for %s: got %s, want %s", status, got, want)
 		}

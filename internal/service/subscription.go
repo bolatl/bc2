@@ -7,7 +7,7 @@ import (
 	"lovelab/internal/payment"
 )
 
-func (a *App) Checkout(ctx context.Context, actor model.Actor, plan string) (dto.CreateCheckoutResponse, error) {
+func (a *App) Checkout(ctx context.Context, actor model.Actor, plan string, addOns ...string) (dto.CreateCheckoutResponse, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if _, err := a.couple(actor); err != nil {
@@ -16,24 +16,30 @@ func (a *App) Checkout(ctx context.Context, actor model.Actor, plan string) (dto
 	if actor.PartnerRole != "A" {
 		return dto.CreateCheckoutResponse{}, fail(403, "forbidden", "The initiating partner manages the couple subscription.")
 	}
-	if _, ok := payment.Prices(plan); !ok {
-		return dto.CreateCheckoutResponse{}, invalid("Choose monthly, yearly, or program.")
+	amount, ok := payment.CheckoutAmount(plan, addOns...)
+	if !ok {
+		return dto.CreateCheckoutResponse{}, invalid("Choose one option: yearly, monthly, or date_night. Options cannot be combined.")
 	}
 	if a.active(actor.CoupleID) {
 		return dto.CreateCheckoutResponse{}, conflict("The couple subscription is already active.")
 	}
-	if pending, ok := a.Subscriptions.Get(actor.CoupleID); ok && pending.Status == "pending" {
+	if pending, ok := a.Subscriptions.Get(actor.CoupleID); ok && pending.Status == "pending" && len(pending.AddOns) == 0 {
 		if pending.Plan != plan {
 			return dto.CreateCheckoutResponse{}, conflict("A checkout for another plan is already pending.")
 		}
-		return dto.CreateCheckoutResponse{CheckoutURL: pending.CheckoutURL, CheckoutSessionID: pending.CheckoutSessionID}, nil
+		return dto.CreateCheckoutResponse{CheckoutURL: pending.CheckoutURL, CheckoutSessionID: pending.CheckoutSessionID, AmountUSD: float64(amount) / 100}, nil
 	}
+	if !payment.IsCheckoutPlan(plan) {
+		return dto.CreateCheckoutResponse{}, invalid("Choose yearly, monthly, or date_night.")
+	}
+	// A stale combined checkout is replaced only after the provider successfully
+	// issues the chosen single-option checkout. Its previous ID then stops matching.
 	result, err := a.Payment.CreateCheckout(ctx, payment.CheckoutRequest{CoupleID: actor.CoupleID, Plan: plan})
 	if err != nil {
 		return dto.CreateCheckoutResponse{}, fail(502, "payment_unavailable", "Checkout is temporarily unavailable.")
 	}
 	a.Subscriptions.Put(actor.CoupleID, model.Subscription{CoupleID: actor.CoupleID, Plan: plan, Status: "pending", CheckoutSessionID: result.CheckoutSessionID, CheckoutURL: result.CheckoutURL})
-	return dto.CreateCheckoutResponse{CheckoutURL: result.CheckoutURL, CheckoutSessionID: result.CheckoutSessionID}, nil
+	return dto.CreateCheckoutResponse{CheckoutURL: result.CheckoutURL, CheckoutSessionID: result.CheckoutSessionID, AmountUSD: float64(amount) / 100}, nil
 }
 func (a *App) ConfirmCheckout(ctx context.Context, actor model.Actor, id string) (dto.SubscriptionResponse, error) {
 	a.mu.Lock()
@@ -52,7 +58,10 @@ func (a *App) ConfirmCheckout(ctx context.Context, actor model.Actor, id string)
 		return dto.SubscriptionResponse{}, notFound()
 	}
 	if s.Status != "active" {
-		if err := a.Payment.VerifyCheckout(ctx, id, actor.CoupleID, s.Plan); err != nil {
+		if len(s.AddOns) != 0 {
+			return dto.SubscriptionResponse{}, fail(409, "payment_unconfirmed", "Choose one option before continuing. This combined checkout is no longer available.")
+		}
+		if err := a.Payment.VerifyCheckout(ctx, id, actor.CoupleID, s.Plan, s.AddOns...); err != nil {
 			return dto.SubscriptionResponse{}, fail(409, "payment_unconfirmed", "Checkout has not been verified as paid.")
 		}
 		now := a.Now()
@@ -69,7 +78,7 @@ func (a *App) ConfirmCheckout(ctx context.Context, actor model.Actor, id string)
 			}
 		}
 	}
-	return dto.SubscriptionResponse{Plan: s.Plan, Status: s.Status, ActivatedAt: s.ActivatedAt}, nil
+	return dto.SubscriptionResponse{Plan: s.Plan, Status: s.Status, ActivatedAt: s.ActivatedAt, AddOns: s.AddOns}, nil
 }
 func (a *App) SubscriptionMe(actor model.Actor) (dto.SubscriptionResponse, error) {
 	a.mu.Lock()
@@ -87,5 +96,5 @@ func (a *App) SubscriptionMe(actor model.Actor) (dto.SubscriptionResponse, error
 	if !ok {
 		return dto.SubscriptionResponse{Plan: defaultPlan(c), Status: "none"}, nil
 	}
-	return dto.SubscriptionResponse{Plan: s.Plan, Status: s.Status, ActivatedAt: s.ActivatedAt}, nil
+	return dto.SubscriptionResponse{Plan: s.Plan, Status: s.Status, ActivatedAt: s.ActivatedAt, AddOns: s.AddOns}, nil
 }

@@ -47,7 +47,7 @@ test('four short onboarding steps lead through the complete prototype flow and s
   await expect(page.getByRole('heading', { name: 'You feel', exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/prototype-insight.png', fullPage: true, animations: 'disabled' });
   await openPlanFromInsight(page, id, true);
-  await expect(page.locator('input[name="plan"]:checked')).toHaveValue('program');
+  await expect(page.locator('input[name="plan"]:checked')).toHaveValue('yearly');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await completeDemoCheckout(page);
   expect((await fightState(page, api, id)).stage).toBe('rehearsal');

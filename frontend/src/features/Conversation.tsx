@@ -8,8 +8,9 @@ import { Button, Loading, Notice, Page, Scale } from '../components/ui';
 import { LockedPreview } from '../components/LockedPreview';
 import { ConversationReflection } from '../components/ConversationReflection';
 import { SakuraJourney } from '../components/SakuraJourney';
+import { PricingOptions } from '../components/PricingOptions';
 import { config } from '../config';
-import { clearCheckout, fallbackPlans, planCopy, readCheckout, saveCheckout } from './checkout-state';
+import { clearCheckout, fallbackPlans, planCopy, planPrice, readCheckout, saveCheckout } from './checkout-state';
 import { useSpeechToText } from '../hooks/useSpeechToText';
 import { useQuestionMotion } from '../hooks/useQuestionMotion';
 import '../styles/conversation.css';
@@ -425,12 +426,13 @@ export function PaywallPage() {
   const [error, setError] = useState<string | null>(null);
   const [skipConfirm, setSkipConfirm] = useState(false);
   const operation = useOperation();
-  const plans = fightResource.data?.currentTurn?.type === 'paywall_required' ? fightResource.data.currentTurn.availablePlans : fallbackPlans;
+  const catalog = fightResource.data?.currentTurn;
+  const plans = catalog?.type === 'paywall_required' ? catalog.availablePlans : fallbackPlans;
   const subscription = subscriptionResource.data ?? couple?.subscription;
-  const pending = subscription?.status === 'pending';
-  const defaultPlan = couple?.defaultPlan || 'yearly';
-  const orderedPlans = [...plans].sort((a, b) => { const order = defaultPlan === 'program' ? ['program', 'yearly', 'monthly'] : ['yearly', 'program', 'monthly']; return order.indexOf(a.plan) - order.indexOf(b.plan); });
-  const selectedPlan = pending ? subscription.plan : selected || plans.find(plan => plan.isDefault)?.plan || defaultPlan;
+  const mixedCheckout = subscription?.status === 'pending' && Boolean(subscription.addOns?.length);
+  const pending = subscription?.status === 'pending' && !mixedCheckout;
+  const selectedPlan = pending ? subscription.plan : selected || plans.find(plan => plan.isDefault)?.plan || 'yearly';
+  const total = planPrice(selectedPlan, plans);
 
   async function checkout() {
     if (!couple || operation.inFlight.current) return;
@@ -466,13 +468,10 @@ export function PaywallPage() {
   return <Page eyebrow="One plan. Both of you." title="Start the talk with a sentence that works." layout="wide" className="paywall-page prototype-paywall">
     <section className="plan-picker" aria-label="Choose a shared plan">
       <ul className="paywall-plan-benefits"><li><Check size={16} /><span>Practice your first sentence and make it your own</span></li><li><Check size={16} /><span>A free link for {couple?.partnerName || 'your partner'} to prepare too</span></li><li><Check size={16} /><span>Personal reflections, check-ins, and your shared journal</span></li></ul>
-      <div className="plan-grid" role="radiogroup" aria-label="Choose your plan">{orderedPlans.map(plan => <label key={plan.plan} className={`plan ${selectedPlan === plan.plan ? 'selected' : ''}`}>
-        {plan.plan === defaultPlan && <span className="prototype-plan-badge">{plan.plan === 'yearly' ? 'Best value' : 'Suggested plan'}</span>}
-        <input className="sr-only" type="radio" name="plan" value={plan.plan} checked={selectedPlan === plan.plan} disabled={operation.busy || Boolean(pending && plan.plan !== selectedPlan)} onChange={() => setSelected(plan.plan)} />
-        <span className="plan-radio" aria-hidden="true">{selectedPlan === plan.plan && <Check size={13} />}</span>
-        <span className="plan-description"><span className="plan-heading">{planCopy[plan.plan]?.title || plan.plan}</span><span>{planCopy[plan.plan]?.description}</span></span>
-        <span className="plan-price">${plan.priceUsd}<small>{plan.plan === 'yearly' ? '$8.25 / month' : planCopy[plan.plan]?.period}</small></span>
-      </label>)}</div>
+      {pending && !fallbackPlans.some(plan => plan.plan === selectedPlan) ? <Notice>Your saved checkout: {planCopy[selectedPlan]?.title} · ${planPrice(selectedPlan)} {planCopy[selectedPlan]?.period}.</Notice>
+        : <PricingOptions plans={plans} selectedPlan={selectedPlan} onPlanChange={setSelected} disabled={operation.busy || Boolean(pending)} />}
+      <div className="pricing-total"><span>{config.paymentMode === 'mock' ? 'Demo total' : 'Due today'}</span><strong>${total.toFixed(2)}</strong></div>
+      {mixedCheckout && <Notice>Choose one option to replace your previous checkout.</Notice>}
       {pending && <Notice>Your checkout is still open. Resume it when you’re ready.</Notice>}
       {error && <Notice kind="error">{error}</Notice>}
       <div className="actions"><Button className="button-coral" disabled={operation.busy || !couple} onClick={() => void checkout()}>{operation.busy ? 'Opening checkout…' : pending ? 'Resume checkout' : 'Continue'}<ArrowRight size={18} /></Button><Link to={id ? `/fight-sessions/${id}/insight` : '/home'}>Not now</Link></div>

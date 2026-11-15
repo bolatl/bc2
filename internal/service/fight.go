@@ -12,6 +12,7 @@ import (
 	"lovelab/internal/dto"
 	"lovelab/internal/llm"
 	"lovelab/internal/model"
+	"lovelab/internal/payment"
 	"lovelab/internal/safety"
 )
 
@@ -652,7 +653,12 @@ func completedResponse(f model.FightSession) dto.CompletedResponse {
 	return dto.CompletedResponse{Type: "completed", ResultURL: "/api/v1/fight-sessions/" + f.ID + "/result"}
 }
 func (a *App) paywall(c model.Couple) dto.PaywallResponse {
-	return dto.PaywallResponse{Type: "paywall_required", AvailablePlans: []dto.PlanOption{{Plan: "monthly", PriceUSD: 14.99, IsDefault: defaultPlan(c) == "monthly"}, {Plan: "yearly", PriceUSD: 99, IsDefault: defaultPlan(c) == "yearly"}, {Plan: "program", PriceUSD: 149, IsDefault: defaultPlan(c) == "program"}}}
+	out := dto.PaywallResponse{Type: "paywall_required", AvailablePlans: make([]dto.PlanOption, 0, 3)}
+	for _, plan := range []string{"yearly", "monthly", "date_night"} {
+		amount, _ := payment.Prices(plan)
+		out.AvailablePlans = append(out.AvailablePlans, dto.PlanOption{Plan: plan, PriceUSD: float64(amount) / 100, IsDefault: plan == defaultPlan(c)})
+	}
+	return out
 }
 func (a *App) fightView(c model.Couple, f model.FightSession) dto.FightSessionResponse {
 	out := dto.FightSessionResponse{SessionID: f.ID, Status: f.Status, Tier: f.Tier, Stage: f.Stage, Turns: append([]model.FightTurn{}, f.Turns...), ThermometerStart: cp(f.ThermometerStart), ThermometerEnd: cp(f.ThermometerEnd), CreatedAt: f.CreatedAt}

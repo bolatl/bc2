@@ -385,8 +385,17 @@ export interface components {
         FightStage: "thermometer_start" | "facts" | "feelings" | "needs" | "partner_view" | "rehearsal" | "thermometer_end" | "ready";
         /** @enum {string} */
         AnswerSource: "card_left" | "card_right" | "free_text";
-        /** @enum {string} */
-        Plan: "monthly" | "yearly" | "program";
+        /**
+         * @description monthly is Kintsugi at USD 19.99/month; yearly is Premium at USD 199/year; date_night is a standalone one-time purchase at USD 69. Exactly one plan is selected. premium_monthly and program remain only for existing legacy purchases and single-plan pending checkout recovery.
+         * @enum {string}
+         */
+        Plan: "monthly" | "yearly" | "date_night" | "premium_monthly" | "program";
+        /**
+         * @deprecated
+         * @description Legacy combined-purchase marker. New Date Night purchases use the standalone date_night plan, never addOns.
+         * @enum {string}
+         */
+        AddOn: "date_night";
         /** @enum {string} */
         SubscriptionStatus: "none" | "pending" | "active";
         /** @enum {string} */
@@ -426,6 +435,11 @@ export interface components {
             plan: components["schemas"]["Plan"];
             status: components["schemas"]["SubscriptionStatus"];
             /**
+             * @deprecated
+             * @description Legacy combined-purchase extras. Existing paid access is preserved; an old combined pending checkout must be replaced by exactly one current plan. Omitted for all new purchases.
+             */
+            addOns?: components["schemas"]["AddOn"][];
+            /**
              * Format: date-time
              * @description RFC 3339 timestamp in UTC.
              */
@@ -462,6 +476,7 @@ export interface components {
              * @description Time invitation became shareable in the current round; null before readiness; not delivery confirmation.
              */
             partnerBInviteSentAt: string | null;
+            /** @description Premium yearly is the default for every relationship status; this does not force a purchase. */
             defaultPlan: components["schemas"]["Plan"];
             subscription: components["schemas"]["SubscriptionResponse"] | null;
             /** @description Whether the current role has completed the personality test. */
@@ -548,7 +563,7 @@ export interface components {
             plan: components["schemas"]["Plan"];
             /** @description Displayed per-plan USD price. */
             priceUsd: number;
-            /** @description Selected by relationship status, not an imposed purchase. */
+            /** @description True for Premium yearly, regardless of relationship status; not an imposed purchase. */
             isDefault: boolean;
         };
         PaywallResponse: {
@@ -557,6 +572,7 @@ export interface components {
              * @enum {string}
              */
             type: "paywall_required";
+            /** @description Three mutually exclusive options — yearly for Premium, monthly for Kintsugi, and one-time date_night. Legacy premium_monthly and program are not offered for new purchases. */
             availablePlans: components["schemas"]["PlanOption"][];
         };
         Hotline: {
@@ -712,13 +728,21 @@ export interface components {
             practice: string | null;
         };
         CreateCheckoutRequest: {
+            /** @description New purchases select exactly one of monthly, yearly, or date_night. premium_monthly and program are accepted only to resume an already pending single-plan legacy checkout. An old combined pending purchase is replaced by a fresh current-plan checkout. */
             plan: components["schemas"]["Plan"];
+            /**
+             * @deprecated
+             * @description Do not send extras. Omit this field or pass an empty array; every nonempty array is rejected with HTTP 400.
+             */
+            addOns?: components["schemas"]["AddOn"][];
         };
         CreateCheckoutResponse: {
             /** @description Absolute Stripe test checkout URL, or clearly marked frontend demo checkout URL. Do not infer payment success from this URL. */
             checkoutUrl: string;
             /** @description Opaque server-generated identifier. Do not infer order or encode user data. */
             checkoutSessionId: string;
+            /** @description Server-calculated single-plan price in USD for the first billing period of a recurring plan, or the standalone one-time price. The payment adapter verifies the amount in integer cents. */
+            amountUsd: number;
         };
         ConfirmCheckoutRequest: {
             /** @description Opaque server-generated identifier. Do not infer order or encode user data. */

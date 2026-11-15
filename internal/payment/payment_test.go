@@ -47,7 +47,13 @@ func TestMockOnlyConfirmsIssuedCheckoutForSameCoupleAndPlan(t *testing.T) {
 }
 
 func TestStripeCreateUsesServerControlledPrice(t *testing.T) {
-	for _, tt := range []struct{ plan, amount, mode, interval string }{{"monthly", "1499", "subscription", "month"}, {"yearly", "9900", "subscription", "year"}, {"program", "14900", "payment", ""}} {
+	for _, tt := range []struct {
+		plan, amount, mode, interval, title string
+	}{
+		{"monthly", "1999", "subscription", "month", "Kintsugi"},
+		{"yearly", "19900", "subscription", "year", "Kintsugi Premium"},
+		{"date_night", "6900", "payment", "", "Kintsugi Date Night"},
+	} {
 		t.Run(tt.plan, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost || r.URL.Path != "/v1/checkout/sessions" {
@@ -65,12 +71,22 @@ func TestStripeCreateUsesServerControlledPrice(t *testing.T) {
 				}
 				for key, want := range map[string]string{
 					"mode": tt.mode, "client_reference_id": "couple-a", "metadata[coupleId]": "couple-a", "metadata[plan]": tt.plan,
+					"metadata[addOns]":                       "",
 					"line_items[0][price_data][unit_amount]": tt.amount, "line_items[0][price_data][currency]": "usd",
 					"line_items[0][price_data][recurring][interval]": tt.interval,
+					"line_items[0][price_data][product_data][name]":  tt.title,
 					"success_url": "http://localhost:3000/checkout/success?session_id={CHECKOUT_SESSION_ID}",
 				} {
 					if got := r.Form.Get(key); got != want {
 						t.Errorf("%s = %q; want %q", key, got, want)
+					}
+				}
+				if r.Form.Has("line_items[1][quantity]") {
+					t.Error("combined mutually exclusive options")
+				}
+				for key := range r.Form {
+					if tt.plan == "date_night" && strings.Contains(key, "[recurring]") {
+						t.Error("Date Night must be one-time")
 					}
 				}
 				json.NewEncoder(w).Encode(stripeCheckout{ID: "cs_test_example", Object: "checkout.session", URL: "https://checkout.stripe.com/c/pay/cs_test_example"})
@@ -87,7 +103,7 @@ func TestStripeCreateUsesServerControlledPrice(t *testing.T) {
 }
 
 func paidCheckout() stripeCheckout {
-	return stripeCheckout{ID: "cs_test_example", Object: "checkout.session", ClientReferenceID: "couple-a", Metadata: map[string]string{"coupleId": "couple-a", "plan": "monthly"}, PaymentStatus: "paid", Status: "complete", Currency: "usd", AmountTotal: 1499, Mode: "subscription"}
+	return stripeCheckout{ID: "cs_test_example", Object: "checkout.session", ClientReferenceID: "couple-a", Metadata: map[string]string{"coupleId": "couple-a", "plan": "monthly"}, PaymentStatus: "paid", Status: "complete", Currency: "usd", AmountTotal: 1999, Mode: "subscription"}
 }
 
 func TestStripeVerifyRequiresPaymentOwnershipAmountAndTestMode(t *testing.T) {

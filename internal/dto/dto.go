@@ -15,6 +15,7 @@ type SubscriptionResponse struct {
 	Plan        string     `json:"plan"`
 	Status      string     `json:"status"`
 	ActivatedAt *time.Time `json:"activatedAt"`
+	AddOns      []string   `json:"addOns,omitempty"`
 }
 type CoupleResponse struct {
 	CoupleID             string                `json:"coupleId"`
@@ -169,11 +170,13 @@ type ReflectionFacet struct {
 	Practice    *string `json:"practice"`
 }
 type CreateCheckoutRequest struct {
-	Plan string `json:"plan"`
+	Plan   string   `json:"plan"`
+	AddOns []string `json:"addOns,omitempty"`
 }
 type CreateCheckoutResponse struct {
-	CheckoutURL       string `json:"checkoutUrl"`
-	CheckoutSessionID string `json:"checkoutSessionId"`
+	CheckoutURL       string  `json:"checkoutUrl"`
+	CheckoutSessionID string  `json:"checkoutSessionId"`
+	AmountUSD         float64 `json:"amountUsd"`
 }
 type ConfirmCheckoutRequest struct {
 	CheckoutSessionID string `json:"checkoutSessionId"`

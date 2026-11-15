@@ -81,7 +81,7 @@ async function observeQuestionMotion(page: Page) {
           phase: panel.getAttribute('data-swipe-phase'),
           direction: panel.getAttribute('data-swipe-direction'),
           x: effect.getKeyframes().map(frame => Number(String(frame.transform).match(/translate(?:3d|X)?\(\s*(-?[\d.]+)/)?.[1] ?? 0)),
-          delay: effect.getTiming().delay,
+          delay: effect.getTiming().delay ?? 0,
         });
         document.documentElement.dataset.questionMotion = JSON.stringify(records);
       }

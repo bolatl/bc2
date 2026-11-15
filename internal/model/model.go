@@ -94,6 +94,7 @@ type FightSession struct {
 }
 type Subscription struct {
 	CoupleID, Plan, Status, CheckoutSessionID, CheckoutURL string
+	AddOns                                                 []string
 	ActivatedAt                                            *time.Time
 }
 type FightRecord struct {

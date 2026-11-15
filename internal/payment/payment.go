@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -22,12 +23,13 @@ var (
 
 type Client interface {
 	CreateCheckout(context.Context, CheckoutRequest) (Checkout, error)
-	VerifyCheckout(ctx context.Context, sessionID, coupleID, plan string) error
+	VerifyCheckout(ctx context.Context, sessionID, coupleID, plan string, addOns ...string) error
 }
 
 type CheckoutRequest struct {
 	CoupleID string
 	Plan     string
+	AddOns   []string
 }
 
 type Checkout struct {
@@ -39,14 +41,31 @@ type Checkout struct {
 func Prices(plan string) (int64, bool) {
 	switch plan {
 	case "monthly":
-		return 1499, true
+		return 1999, true
 	case "yearly":
-		return 9900, true
+		return 19900, true
+	case "date_night":
+		return 6900, true
+	case "premium_monthly":
+		return 2999, true
 	case "program":
 		return 14900, true
 	default:
 		return 0, false
 	}
+}
+
+func IsCheckoutPlan(plan string) bool {
+	return plan == "monthly" || plan == "yearly" || plan == "date_night"
+}
+
+// CheckoutAmount accepts retired plans only for verifying or resuming an
+// existing checkout. New checkouts require a currently offered plan.
+func CheckoutAmount(plan string, addOns ...string) (int64, bool) {
+	if len(addOns) != 0 {
+		return 0, false
+	}
+	return Prices(plan)
 }
 
 type Mock struct {
@@ -65,7 +84,7 @@ func (m *Mock) CreateCheckout(ctx context.Context, request CheckoutRequest) (Che
 	if err := ctx.Err(); err != nil {
 		return Checkout{}, err
 	}
-	if _, ok := Prices(request.Plan); !ok {
+	if _, ok := CheckoutAmount(request.Plan, request.AddOns...); !ok || !IsCheckoutPlan(request.Plan) {
 		return Checkout{}, ErrInvalidPlan
 	}
 	if request.CoupleID == "" {
@@ -76,17 +95,18 @@ func (m *Mock) CreateCheckout(ctx context.Context, request CheckoutRequest) (Che
 		return Checkout{}, fmt.Errorf("generate checkout id: %w", err)
 	}
 	id := "cs_mock_" + hex.EncodeToString(nonce[:])
+	request.AddOns = slices.Clone(request.AddOns)
 	m.mu.Lock()
 	m.sessions[id] = request
 	m.mu.Unlock()
 	return Checkout{CheckoutSessionID: id, CheckoutURL: m.baseURL + "/checkout/demo?session_id=" + url.QueryEscape(id) + "&demo=true"}, nil
 }
 
-func (m *Mock) VerifyCheckout(ctx context.Context, sessionID, coupleID, plan string) error {
+func (m *Mock) VerifyCheckout(ctx context.Context, sessionID, coupleID, plan string, addOns ...string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if _, ok := Prices(plan); !ok {
+	if _, ok := CheckoutAmount(plan, addOns...); !ok {
 		return ErrInvalidPlan
 	}
 	m.mu.Lock()
@@ -95,7 +115,7 @@ func (m *Mock) VerifyCheckout(ctx context.Context, sessionID, coupleID, plan str
 	if !exists {
 		return ErrCheckoutNotFound
 	}
-	if request.CoupleID != coupleID || request.Plan != plan {
+	if request.CoupleID != coupleID || request.Plan != plan || !slices.Equal(request.AddOns, addOns) {
 		return ErrCheckoutMismatch
 	}
 	return nil

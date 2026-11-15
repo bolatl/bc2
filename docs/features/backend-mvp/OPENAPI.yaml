@@ -1290,10 +1290,19 @@ components:
       - free_text
     Plan:
       type: string
+      description: monthly is Kintsugi at USD 19.99/month; yearly is Premium at USD 199/year; date_night is a standalone one-time purchase at USD 69. Exactly one plan is selected. premium_monthly and program remain only for existing legacy purchases and single-plan pending checkout recovery.
       enum:
       - monthly
       - yearly
+      - date_night
+      - premium_monthly
       - program
+    AddOn:
+      type: string
+      deprecated: true
+      description: Legacy combined-purchase marker. New Date Night purchases use the standalone date_night plan, never addOns.
+      enum:
+      - date_night
     SubscriptionStatus:
       type: string
       enum:
@@ -1396,6 +1405,14 @@ components:
           $ref: '#/components/schemas/Plan'
         status:
           $ref: '#/components/schemas/SubscriptionStatus'
+        addOns:
+          type: array
+          deprecated: true
+          description: Legacy combined-purchase extras. Existing paid access is preserved; an old combined pending checkout must be replaced by exactly one current plan. Omitted for all new purchases.
+          items:
+            $ref: '#/components/schemas/AddOn'
+          maxItems: 1
+          uniqueItems: true
         activatedAt:
           type:
           - string
@@ -1479,6 +1496,7 @@ components:
           format: date-time
         defaultPlan:
           $ref: '#/components/schemas/Plan'
+          description: Premium yearly is the default for every relationship status; this does not force a purchase.
         subscription:
           anyOf:
           - $ref: '#/components/schemas/SubscriptionResponse'
@@ -1700,7 +1718,7 @@ components:
           minimum: 0
         isDefault:
           type: boolean
-          description: Selected by relationship status, not an imposed purchase.
+          description: True for Premium yearly, regardless of relationship status; not an imposed purchase.
     PaywallResponse:
       type: object
       additionalProperties: false
@@ -1713,6 +1731,7 @@ components:
           const: paywall_required
         availablePlans:
           type: array
+          description: Three mutually exclusive options — yearly for Premium, monthly for Kintsugi, and one-time date_night. Legacy premium_monthly and program are not offered for new purchases.
           items:
             $ref: '#/components/schemas/PlanOption'
           minItems: 3
@@ -2142,18 +2161,31 @@ components:
       properties:
         plan:
           $ref: '#/components/schemas/Plan'
+          description: New purchases select exactly one of monthly, yearly, or date_night. premium_monthly and program are accepted only to resume an already pending single-plan legacy checkout. An old combined pending purchase is replaced by a fresh current-plan checkout.
+        addOns:
+          type: array
+          deprecated: true
+          description: Do not send extras. Omit this field or pass an empty array; every nonempty array is rejected with HTTP 400.
+          items:
+            $ref: '#/components/schemas/AddOn'
+          maxItems: 0
     CreateCheckoutResponse:
       type: object
       additionalProperties: false
       required:
       - checkoutUrl
       - checkoutSessionId
+      - amountUsd
       properties:
         checkoutUrl:
           type: string
           description: Absolute Stripe test checkout URL, or clearly marked frontend demo checkout URL. Do not infer payment
             success from this URL.
         checkoutSessionId: *id001
+        amountUsd:
+          type: number
+          minimum: 0
+          description: Server-calculated single-plan price in USD for the first billing period of a recurring plan, or the standalone one-time price. The payment adapter verifies the amount in integer cents.
     ConfirmCheckoutRequest:
       type: object
       additionalProperties: false

@@ -64,10 +64,7 @@ func (a *App) active(coupleID string) bool {
 	s, ok := a.Subscriptions.Get(coupleID)
 	return ok && s.Status == "active"
 }
-func defaultPlan(c model.Couple) string {
-	if c.ProfileA.RelationshipStatus == "engaged" {
-		return "program"
-	}
+func defaultPlan(_ model.Couple) string {
 	return "yearly"
 }
 func contains(s string, values ...string) bool {
@@ -120,6 +117,7 @@ func clonePersonality(p model.PersonalityProfile) model.PersonalityProfile {
 }
 func cloneSubscription(s model.Subscription) model.Subscription {
 	s.ActivatedAt = cp(s.ActivatedAt)
+	s.AddOns = append([]string(nil), s.AddOns...)
 	return s
 }
 func cloneRecord(r model.FightRecord) model.FightRecord {

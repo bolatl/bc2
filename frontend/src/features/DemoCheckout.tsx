@@ -6,7 +6,7 @@ import { api, errorMessage } from '../api/client';
 import type { Checkout, Subscription } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page } from '../components/ui';
-import { clearCheckout, fallbackPlans, planCopy, readCheckout, saveCheckout } from './checkout-state';
+import { clearCheckout, planCopy, planPrice, readCheckout, saveCheckout } from './checkout-state';
 import '../styles/demo-checkout.css';
 
 type CardFields = { name: string; number: string; expiry: string; cvc: string };
@@ -41,6 +41,7 @@ export function DemoCheckoutPage() {
   const currentSessionId = couple?.currentSessionId ?? null;
   const [phase, setPhase] = useState<'loading' | 'ready' | 'paid' | 'error'>('loading');
   const [plan, setPlan] = useState('');
+  const [amount, setAmount] = useState(0);
   const [fields, setFields] = useState<CardFields>(demoFields);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
@@ -64,16 +65,20 @@ export function DemoCheckoutPage() {
       try {
         if (!/^cs_mock_[a-f0-9]{48}$/.test(checkoutId)) throw new Error('This demo checkout link is invalid. Return to your plans to open a new checkout.');
         const subscription = await api<Subscription>('/subscriptions/me', undefined, { signal: controller.signal });
-        if (!fallbackPlans.some(item => item.plan === subscription.plan)) throw new Error('This plan is not available. Return to your plans.');
+        if (!Object.hasOwn(planCopy, subscription.plan)) throw new Error('This plan is not available. Return to your plans.');
         if (controller.signal.aborted) return;
         setPlan(subscription.plan);
+        setAmount(planPrice(subscription.plan));
         if (subscription.status === 'active') { setPhase('paid'); return; }
         if (subscription.status !== 'pending') throw new Error('There is no pending checkout. Choose your plan first.');
+        if (subscription.addOns?.length) throw new Error('Choose one option on the pricing page to replace your previous checkout.');
         // The backend restores the pending checkout and its plan; URL parameters
         // and browser storage are never trusted to choose a different purchase.
         const checkout = await api<Checkout>('/subscriptions/checkout', { plan: subscription.plan }, { signal: controller.signal });
         if (checkout.checkoutSessionId !== checkoutId) throw new Error('This checkout does not belong to your current session. Return to your plans.');
+        if (!Number.isFinite(checkout.amountUsd) || checkout.amountUsd <= 0) throw new Error('Your checkout total is unavailable. Return to your plans and try again.');
         if (controller.signal.aborted) return;
+        setAmount(checkout.amountUsd);
         saveCheckout({ coupleId: coupleId!, checkoutSessionId: checkoutId, sessionId: continuation.current, plan: subscription.plan });
         setPhase('ready');
       } catch (reason) {
@@ -132,7 +137,6 @@ export function DemoCheckoutPage() {
   if (phase === 'loading') return <Loading label="Opening your demo checkout…" />;
   if (phase === 'error') return <Page title="Let’s reopen your checkout."><Notice kind="error">{error}</Notice><div className="actions"><Button onClick={() => setAttempt(value => value + 1)}>Try again</Button><Link className="text-link" to={returnToPlans}>Return to plans</Link></div></Page>;
   const copy = planCopy[plan];
-  const amount = fallbackPlans.find(item => item.plan === plan)?.priceUsd;
   if (phase === 'paid') return <Page eyebrow="Demo checkout complete" title="Your plan is active." description="Both of you now have full access. No payment was taken." layout="wide" className="demo-checkout-page">
     <section className="demo-checkout-success">
       <span className="demo-success-icon"><Check size={32} aria-hidden="true" /></span>
@@ -148,7 +152,7 @@ export function DemoCheckoutPage() {
       <aside className="demo-order-summary" aria-label="Order summary">
         <span className="demo-summary-icon"><HeartHandshake size={28} aria-hidden="true" /></span>
         <p className="eyebrow">Your selected plan</p><h2>{copy?.title}</h2>
-        <div className="demo-plan-price">${amount?.toFixed(2)}<span>{copy?.period}</span></div>
+        <div className="demo-plan-price">${amount.toFixed(2)}<span>{copy?.period}</span></div>
         <p className="demo-plan-description">{copy?.description}</p>
         <ul className="demo-plan-benefits">
           <li><Check size={17} aria-hidden="true" /><span>Find the words for your next conversation</span></li>
@@ -161,7 +165,7 @@ export function DemoCheckoutPage() {
       <dialog ref={dialog} className="demo-payment-panel" aria-labelledby="demo-payment-heading" aria-describedby="demo-payment-note" onCancel={event => { event.preventDefault(); if (!busy) navigate('/checkout/cancel'); }}>
         <span className="demo-sheet-handle" aria-hidden="true" />
         <div className="demo-payment-heading"><h2 id="demo-payment-heading" tabIndex={-1}>Pay with card</h2><span className="demo-test-badge">Test mode</span></div>
-        <div className="demo-checkout-line"><span>Kintsugi · {copy?.title}</span><strong>${amount?.toFixed(2)}</strong></div>
+        <div className="demo-checkout-line"><span>{copy?.title} <small>{copy?.period}</small></span><strong>${amount.toFixed(2)}</strong></div>
         <form ref={form} onSubmit={event => void submit(event)} noValidate autoComplete="off" aria-label="Demo payment details">
           <fieldset disabled={busy} className="demo-card-fields"><legend className="sr-only">Test card information</legend>
             <div className="demo-card-field"><label htmlFor="demo-name">Cardholder name</label><input id="demo-name" name="name" value={fields.name} onChange={event => update('name', event.target.value)} placeholder="Demo User" maxLength={80} required autoComplete="off" aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'demo-name-error' : undefined} />{errors.name && <span className="demo-field-error" id="demo-name-error">{errors.name}</span>}</div>
@@ -172,7 +176,7 @@ export function DemoCheckoutPage() {
             </div>
           </fieldset>
           {error && <Notice kind="error">{error}</Notice>}
-          <Button type="submit" className="demo-pay-button" disabled={busy}>{busy ? <><LoaderCircle className="spinner" size={18} aria-hidden="true" />Activating your plan…</> : <>Pay ${amount?.toFixed(2)}<ArrowRight size={18} aria-hidden="true" /></>}</Button>
+          <Button type="submit" className="demo-pay-button" disabled={busy}>{busy ? <><LoaderCircle className="spinner" size={18} aria-hidden="true" />Activating your plan…</> : <>Pay ${amount.toFixed(2)}<ArrowRight size={18} aria-hidden="true" /></>}</Button>
           <p className="demo-payment-privacy" id="demo-payment-note"><ShieldCheck size={17} aria-hidden="true" /><span>Test card prefilled. No real charge. Use test details only; they stay in this page.</span></p>
           <div className="demo-checkout-cancel">{busy ? <span role="status">Confirming your demo plan…</span> : <Link to="/checkout/cancel"><ArrowLeft size={15} aria-hidden="true" />Cancel</Link>}</div>
         </form>

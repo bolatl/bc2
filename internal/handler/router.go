@@ -201,7 +201,7 @@ func (h *Handler) checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor, _ := session.Actor(r.Context())
-	out, err := h.app.Checkout(r.Context(), actor, req.Plan)
+	out, err := h.app.Checkout(r.Context(), actor, req.Plan, req.AddOns...)
 	respond(w, 201, out, err)
 }
 func (h *Handler) confirm(w http.ResponseWriter, r *http.Request) {

@@ -63,10 +63,10 @@ type stripeCheckout struct {
 }
 
 func (s *Stripe) CreateCheckout(ctx context.Context, request CheckoutRequest) (Checkout, error) {
-	amount, ok := Prices(request.Plan)
-	if !ok {
+	if _, ok := CheckoutAmount(request.Plan, request.AddOns...); !ok || !IsCheckoutPlan(request.Plan) {
 		return Checkout{}, ErrInvalidPlan
 	}
+	amount, _ := Prices(request.Plan)
 	if request.CoupleID == "" {
 		return Checkout{}, ErrCheckoutMismatch
 	}
@@ -80,7 +80,7 @@ func (s *Stripe) CreateCheckout(ctx context.Context, request CheckoutRequest) (C
 		"line_items[0][quantity]":                {"1"},
 		"line_items[0][price_data][currency]":    {"usd"},
 		"line_items[0][price_data][unit_amount]": {strconv.FormatInt(amount, 10)},
-		"line_items[0][price_data][product_data][name]": {"Kintsugi " + request.Plan},
+		"line_items[0][price_data][product_data][name]": {planTitle(request.Plan)},
 		"payment_method_types[0]":                       {"card"},
 	}
 	if request.Plan == "monthly" {
@@ -103,8 +103,8 @@ func (s *Stripe) CreateCheckout(ctx context.Context, request CheckoutRequest) (C
 	return Checkout{CheckoutSessionID: result.ID, CheckoutURL: result.URL}, nil
 }
 
-func (s *Stripe) VerifyCheckout(ctx context.Context, sessionID, coupleID, plan string) error {
-	amount, ok := Prices(plan)
+func (s *Stripe) VerifyCheckout(ctx context.Context, sessionID, coupleID, plan string, addOns ...string) error {
+	amount, ok := CheckoutAmount(plan, addOns...)
 	if !ok {
 		return ErrInvalidPlan
 	}
@@ -115,7 +115,7 @@ func (s *Stripe) VerifyCheckout(ctx context.Context, sessionID, coupleID, plan s
 	if err != nil {
 		return err
 	}
-	if result.ID != sessionID || result.Object != "checkout.session" || result.LiveMode || result.ClientReferenceID != coupleID || result.Metadata["coupleId"] != coupleID || result.Metadata["plan"] != plan || result.Currency != "usd" || result.AmountTotal != amount || result.Mode != checkoutMode(plan) {
+	if result.ID != sessionID || result.Object != "checkout.session" || result.LiveMode || result.ClientReferenceID != coupleID || result.Metadata["coupleId"] != coupleID || result.Metadata["plan"] != plan || result.Metadata["addOns"] != strings.Join(addOns, ",") || result.Currency != "usd" || result.AmountTotal != amount || result.Mode != checkoutMode(plan) {
 		return ErrCheckoutMismatch
 	}
 	if result.PaymentStatus != "paid" || result.Status != "complete" {
@@ -125,10 +125,20 @@ func (s *Stripe) VerifyCheckout(ctx context.Context, sessionID, coupleID, plan s
 }
 
 func checkoutMode(plan string) string {
-	if plan == "program" {
+	if plan == "program" || plan == "date_night" {
 		return "payment"
 	}
 	return "subscription"
+}
+
+func planTitle(plan string) string {
+	if plan == "yearly" {
+		return "Kintsugi Premium"
+	}
+	if plan == "date_night" {
+		return "Kintsugi Date Night"
+	}
+	return "Kintsugi"
 }
 
 func (s *Stripe) call(ctx context.Context, method, path string, body io.Reader) (stripeCheckout, error) {
