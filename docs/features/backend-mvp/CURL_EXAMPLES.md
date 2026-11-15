@@ -120,7 +120,7 @@ curl 'http://localhost:8080/api/v1/personality-tests/me'
 curl 'http://localhost:8080/api/v1/subscriptions/me'
 ```
 
-Журнал и статистика (записи появляются, только когда оба партнёра завершили раунд):
+Журнал и статистика (записи появляются, только когда оба партнёра завершили раунд, см. разделы 8 и 9):
 
 ```bash
 curl 'http://localhost:8080/api/v1/journal'
@@ -130,7 +130,71 @@ curl 'http://localhost:8080/api/v1/journal'
 curl 'http://localhost:8080/api/v1/journal/stats'
 ```
 
-## 8. Дополнительно
+## 8. Партнёр B и общий журнал
+
+Условия: A уже прошёл сессию до конца (`ready`) и оплатил. Запросы B делайте **с другой кукой**: в Postman в отдельном окне или после очистки кук, в curl с отдельным файлом (`-c b.jar -b b.jar`). Иначе сервер примет вас за A. Токен приглашения берётся из `inviteUrl` (кука A): последняя часть адреса.
+
+Получить `inviteUrl` (кука A):
+
+```bash
+curl 'http://localhost:8080/api/v1/couples/me'
+```
+
+Войти по приглашению (кука B). Ответ содержит `partnerRole: "B"` и нейтральную тему; кука B выставится автоматически:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/invites/<inviteToken>/join' -H 'Content-Type: application/json' -d '{"age":"30-34","conflictStyle":"talk_now","repairNeed":"plan"}'
+```
+
+Начать сессию B (кука B). Из ответа взять `sessionId` B, он отличается от `sessionId` A:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/fight-sessions' -H 'Content-Type: application/json' -d '{}'
+```
+
+Ходы B проходят так же, как у A (раздел 4 и 6): `POST /fight-sessions/<sessionIdB>/turns` с растущим `turnIndex` (0, 1, 2, …) до этапа `ready`. Отдельная оплата B не нужна, подписку оформляет A на пару. Пример хода:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionIdB>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":0,"answerSource":"free_text","answerText":"6"}'
+```
+
+Итог B (кука B):
+
+```bash
+curl 'http://localhost:8080/api/v1/fight-sessions/<sessionIdB>/result'
+```
+
+## 9. Журнал, оценки и статистика
+
+Когда оба партнёра ответили на `ready`, создаётся общая запись. Дальше запросы можно делать с любой из двух кук.
+
+Журнал (в записи заполнен `bothReadyAt`; из него взять `id` записи как `fightRecordId`):
+
+```bash
+curl 'http://localhost:8080/api/v1/journal'
+```
+
+Оценка разговора: число от 1 до 10 (каждый партнёр ставит свою, со своей кукой):
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/journal/<fightRecordId>/rating' -H 'Content-Type: application/json' -d '{"rating":7}'
+```
+
+Или «мы ещё не говорили» (поле `rating` обязательно, `null` задаётся явно):
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/journal/<fightRecordId>/rating' -H 'Content-Type: application/json' -d '{"rating":null}'
+```
+
+Статистика: темы, динамика оценок, время до готовности обоих:
+
+```bash
+curl 'http://localhost:8080/api/v1/journal/stats'
+```
+
+Статус партнёра B виден у A в `GET /couples/me` (поле `partnerBStatus`) и в поле `partnerStatus` результата сессии.
+
+## 10. Дополнительно
 
 Вернуться на ход назад:
 
@@ -154,4 +218,4 @@ curl -X DELETE 'http://localhost:8080/api/v1/couples/me'
 
 - `503 generation_unavailable`: OpenAI вернул ошибку (неверный ключ, лимит) или ответ не прошёл проверки; причина в stderr сервера.
 - `409`: неверный `turnIndex` (устарел или повторён). Возьмите актуальный из `GET /fight-sessions/<sessionId>`.
-- `404`: сессия не ваша или куки потеряны (создайте пару заново).
+- `404`: сессия не ваша или куки потеряны (создайте пару заново). Для B это также значит, что запрос ушёл с кукой A.
