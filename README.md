@@ -1,29 +1,29 @@
-**Важно: первое открытие приложения после простоя может занять около 1 минуты, иногда дольше. Бесплатный сервер Render «засыпает» без активности и запускается заново при обращении. Дождитесь загрузки — это нормально.**
+**Please allow about 1 minute, sometimes longer, for the app to load after inactivity. Render's free server goes to sleep when idle and needs time to wake up. This delay is normal.**
 
 # Kintsugi
 
-Kintsugi помогает парам подготовиться к разговору после ссоры: разобраться в своих чувствах, подобрать первые слова и понять друг друга. Каждый партнёр проходит подготовку отдельно; личные ответы остаются приватными.
+Kintsugi helps couples prepare for a conversation after an argument: understand their feelings, find the first words, and understand each other. Each partner prepares separately, and their personal answers stay private.
 
-## Что уже работает
+## Current features
 
-- Короткое знакомство, личный профиль и необязательный тест «О себе» с результатами в «Моём пространстве».
-- Вопросы с учётом ситуации и предыдущих ответов, оценка состояния до и после подготовки, голосовой ввод в поддерживаемых браузерах.
-- Личный разбор, репетиция первых фраз и план разговора.
-- Приглашение партнёра по ссылке и отображение его готовности к разговору.
-- Журнал текущих и прошлых разговоров, новые разговоры и совместные оценки результата.
-- Демонстрационная оплата с заполненной тестовой картой. Доступ действует для пары и сохраняется для следующих разговоров; реальных списаний нет.
+- Short onboarding, a personal profile, and an optional "About me" questionnaire with results in "My space."
+- Questions tailored to the situation and previous answers, before-and-after mood ratings, and speech-to-text in supported browsers.
+- Personal reflections, opening-line rehearsal, and a conversation plan.
+- Partner invitations by link and a view of their readiness to talk.
+- A journal of current and past conversations, new conversations, and shared follow-up ratings.
+- Demo checkout with a prefilled test card. Access covers both partners and carries over to future conversations; no real charges are made.
 
-## Что нужно для локального запуска
+## Local requirements
 
 - **Go 1.26**.
-- **Node.js 24** и **npm**.
-- **Make** и оболочка Bash / POSIX. На Windows используйте **WSL2**.
+- **Node.js 24** and **npm**.
+- **Make** and a Bash / POSIX shell. On Windows, use **WSL2**.
 
-База данных не нужна. По умолчанию данные хранятся в памяти до перезапуска сервера. API-ключ необязателен: без него работает локальный режим с заранее заданными ответами.
+No database is required. By default, data stays in memory until the server restarts. An API key is optional: without one, the app uses a local mock with predefined responses.
 
-## Как запустить
+## Run locally
 
-Из корня репозитория установите зависимости и создайте локальные настройки. `cp -n` сохраняет уже существующие `.env`:
+From the repository root, install dependencies and create the local configuration files. `cp -n` preserves any existing `.env` files:
 
 ```bash
 go mod download
@@ -32,22 +32,22 @@ cp -n .env.example .env
 cp -n frontend/.env.example frontend/.env
 ```
 
-В первом терминале запустите backend:
+Start the backend in the first terminal:
 
 ```bash
 make run-env
 ```
 
-Во втором терминале, также из корня проекта, запустите frontend:
+Start the frontend in a second terminal, also from the repository root:
 
 ```bash
 npm --prefix frontend run dev
 ```
 
-Откройте **http://localhost:5173**. API работает на **http://localhost:8080**. Для проверки приглашения партнёра откройте его ссылку в другом браузере или в режиме инкогнито.
+Open **http://localhost:5173**. The API runs at **http://localhost:8080**. To test a partner invitation, open its link in another browser or an incognito window.
 
-Чтобы использовать Claude, укажите `LLM_PROVIDER=anthropic` и свой `LLM_API_KEY` в **корневом `.env`**, затем перезапустите backend. Ключ нужен только серверу; в `frontend/.env` его добавлять не нужно.
+To use Claude, set `LLM_PROVIDER=anthropic` and your `LLM_API_KEY` in the **root `.env`**, then restart the backend. The key belongs only on the server; do not put it in `frontend/.env`.
 
-Для сохранения данных между локальными перезапусками задайте в корневом `.env` путь `DATA_FILE=./data/kintsugi.json` и постоянный случайный `SESSION_SECRET` длиной не менее 32 символов. На бесплатном Render локальные данные могут сбрасываться при остановке сервиса ([ограничения тарифа](https://render.com/docs/free)).
+To preserve data across local restarts, set `DATA_FILE=./data/kintsugi.json` and a fixed, randomly generated `SESSION_SECRET` of at least 32 characters in the root `.env`. On Render's free tier, local data can be lost when the service stops ([free-tier limitations](https://render.com/docs/free)).
 
-Для разработки: `make check` проверяет backend; `npm --prefix frontend run lint` и `npm --prefix frontend run build` — frontend. Для Go-проверок с `-race` нужен C-компилятор. Необязательные Python-инструменты требуют Python 3.10+ с `venv`/`pip` (`make setup-python`), браузерные тесты — Chromium (`make setup-browser`). Контракт API находится в [`api/openapi.yaml`](api/openapi.yaml).
+For development, run `make check` for the backend, and `npm --prefix frontend run lint` and `npm --prefix frontend run build` for the frontend. Go's `-race` checks require a C compiler. Optional Python tools need Python 3.10+ with `venv`/`pip` (`make setup-python`); browser tests need Chromium (`make setup-browser`). The API contract is in [`api/openapi.yaml`](api/openapi.yaml).
