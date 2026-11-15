@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Copy, HeartHandshake, LockKeyhole, MessageCircle, MessageSquareText, Phone, RefreshCw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Copy, HeartHandshake, LockKeyhole, MessageCircle, MessageSquareText, Mic, MicOff, Phone, RefreshCw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
 import { api, ApiError } from '../api/client';
 import type { Checkout, Couple, Fight, PlanOption, Result, Subscription, TurnResponse } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page, Scale } from '../components/ui';
 import { config } from '../config';
+import { useSpeechToText } from '../hooks/useSpeechToText';
 import '../styles/conversation.css';
 
 // Keep in sync with MaxAnswerChars in internal/service/fight.go.
@@ -125,6 +126,7 @@ export function FightPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [needsCheck, setNeedsCheck] = useState(false);
   const [confirm, setConfirm] = useState<'back' | 'skip' | null>(null);
+  const speech = useSpeechToText(text => setDraft(prev => !prev ? text : /\s$/.test(prev) ? prev + text : `${prev} ${text}`));
   const current = fight?.currentTurn;
   const question = current?.type === 'next_turn' ? current : null;
   const locked = operation.busy || needsCheck;
@@ -200,6 +202,7 @@ export function FightPage() {
 
   function answer(source: 'card_left' | 'card_right' | 'free_text', text?: string) {
     if (!question) return;
+    speech.cancel();
     void mutate('turns', { turnIndex: question.turnIndex, answerSource: source, ...(text === undefined ? {} : { answerText: text }) });
   }
 
@@ -252,7 +255,13 @@ export function FightPage() {
         </div>
         {question.stage !== 'ready' && <form className="free-answer" onSubmit={e => { e.preventDefault(); if (draft.trim() && count <= maxAnswerChars) answer('free_text', draft); }}>
           <label htmlFor="own-answer">Or put it in your own words</label>
+          <div className="voice-field">
           <textarea id="own-answer" value={draft} disabled={locked} rows={3} placeholder="What feels true for you?" aria-describedby="answer-count" onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (draft.trim() && count <= maxAnswerChars) answer('free_text', draft); } }} />
+            <span className="voice-button-wrap" title={speech.isSupported ? undefined : 'Voice input works in Chrome, Edge or Safari'}>
+              <button type="button" className={`voice-button${speech.isListening ? ' is-listening' : ''}`} disabled={!speech.isSupported || locked} onClick={speech.isListening ? speech.stop : speech.start} aria-label={!speech.isSupported ? 'Voice input works in Chrome, Edge or Safari' : speech.isListening ? 'Stop voice input' : 'Start voice input'} title={speech.isSupported ? speech.isListening ? 'Stop voice input' : 'Speak your answer' : undefined}>{speech.isListening ? <MicOff size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}</button>
+            </span>
+          </div>
+          <p className={`voice-status${speech.error && !speech.isListening ? ' is-error' : ''}`} role="status">{speech.isListening ? <><span className="voice-dot" aria-hidden="true" />Listening…{speech.interim && <span className="voice-interim">{speech.interim}</span>}</> : speech.error}</p>
           <div className="answer-footer"><span id="answer-count">{count} / {maxAnswerChars}<span className="keyboard-hint">Shift + Enter for a new line</span></span><Button disabled={!draft.trim() || count > maxAnswerChars || locked} type="submit">Continue <ArrowRight size={18} aria-hidden="true" /></Button></div>
           {count > maxAnswerChars && <p role="alert">Please keep your answer within {maxAnswerChars} characters.</p>}
         </form>}
