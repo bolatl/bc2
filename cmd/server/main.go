@@ -33,10 +33,25 @@ func main() {
 		payments = stripe
 		paymentMode = "stripe_test"
 	}
+	var generator llm.Client = llm.NewMock()
+	llmMode := "mock"
 	if cfg.LLMAPIKey != "" {
-		slog.Warn("LLM_API_KEY is configured, but this MVP uses the deterministic LLM mock")
+		httpClient := &http.Client{Timeout: 30 * time.Second}
+		var g *llm.Generator
+		var e error
+		if cfg.LLMProvider == "anthropic" {
+			g, e = llm.NewAnthropic(cfg.LLMAPIKey, cfg.LLMModel, cfg.LLMBaseURL, httpClient)
+		} else {
+			g, e = llm.NewOpenAI(cfg.LLMAPIKey, cfg.LLMModel, cfg.LLMBaseURL, httpClient)
+		}
+		if e != nil {
+			slog.Error("invalid LLM configuration", "error", e)
+			os.Exit(1)
+		}
+		generator = g
+		llmMode = cfg.LLMProvider
 	}
-	app := service.New(cfg, llm.NewMock(), payments)
+	app := service.New(cfg, generator, payments)
 	server := &http.Server{Addr: cfg.Addr, Handler: handler.New(app), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -51,7 +66,7 @@ func main() {
 		}
 		close(stopped)
 	}()
-	slog.Info("Love Lab backend listening", "address", cfg.Addr, "llm_mode", "mock", "payment_mode", paymentMode)
+	slog.Info("Love Lab backend listening", "address", cfg.Addr, "llm_mode", llmMode, "payment_mode", paymentMode)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server failed", "error", err)
 		os.Exit(1)
