@@ -85,6 +85,7 @@ async function finish(page: Page, id: string) {
 
 test('short flow checkpoint survives reload and a failed decision can be retried', async ({ page }) => {
   const id = await create(page);
+  await expect(page.getByText('Full demo access — no payment needed', { exact: false })).toBeVisible();
   const current = await checkpoint(page, id);
   await page.reload();
   await expectCheckpoint(page, current);

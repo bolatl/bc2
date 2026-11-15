@@ -57,9 +57,9 @@ VITE_LLM_MODE=mock VITE_PAYMENT_MODE=mock npm run dev
 
 | Параметр | Назначение |
 | --- | --- |
-| `VITE_API_ORIGIN` | По умолчанию `http://localhost:8080`; пустое значение — API на том же origin. Без `/api/v1` в конце |
+| `VITE_API_ORIGIN` | В разработке по умолчанию `http://localhost:8080`; в production-сборке по умолчанию тот же origin. Пустое значение также означает тот же origin. Без `/api/v1` в конце |
 | `VITE_LLM_MODE` | `unknown`, `mock`, `openai`, `anthropic`; подпись режима и пояснение об обработке данных |
-| `VITE_PAYMENT_MODE` | `unknown`, `mock`, `stripe_test`; подпись режима оплаты |
+| `VITE_PAYMENT_MODE` | `unknown`, `mock`, `stripe_test`, `disabled`; для демонстрации без оплаты используйте `disabled` вместе с серверным `DISABLE_PAYWALL=true` |
 
 Параметры режима не переключают Go и не открывают платный доступ. Сверяйте их с серверным логом `llm_mode`/`payment_mode`. Секреты провайдера/Stripe/сессии остаются в корневом `.env`; никаких API-ключей в `VITE_*`. API не сообщает текущие `FUNNEL` и `DATA_FILE`: этапы берутся из ответа сервера, а пояснение о сохранении в настройках описывает оба возможных режима.
 

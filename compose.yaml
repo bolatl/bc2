@@ -1,0 +1,56 @@
+# Single-server HTTPS deployment. Never run multiple app replicas with DATA_FILE.
+# Usage: docker compose --env-file .env.deploy up -d --build
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_LLM_MODE: ${VITE_LLM_MODE:-unknown}
+        VITE_PAYMENT_MODE: ${VITE_PAYMENT_MODE:-disabled}
+    environment:
+      APP_ENV: production
+      ADDR: :8080
+      FRONTEND_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env.deploy}
+      ALLOWED_ORIGINS: https://${APP_DOMAIN:?Set APP_DOMAIN in .env.deploy}
+      COOKIE_SECURE: "true"
+      SESSION_SECRET: ${SESSION_SECRET:?Run make prepare-deploy}
+      DATA_FILE: /data/lovelab.json
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      STRIPE_SECRET_KEY: ""
+      DISABLE_PAYWALL: "true"
+      FREE_TURNS: "4"
+      MAX_TURNS: "12"
+      FUNNEL: short
+      ENABLE_CHECKPOINTS: "false"
+      ENABLE_REHEARSAL: "false"
+    volumes:
+      - app_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 40s
+
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.deploy}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+    restart: unless-stopped
+
+volumes:
+  app_data:
+  caddy_data:
+  caddy_config:

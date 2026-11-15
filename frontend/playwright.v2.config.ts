@@ -22,7 +22,7 @@ export default defineConfig({
     },
     {
       command: 'npm run dev -- --port 5176', url: 'http://localhost:5176',
-      env: { ...process.env, VITE_API_ORIGIN: 'http://localhost:18082', VITE_LLM_MODE: 'mock', VITE_PAYMENT_MODE: 'mock' },
+      env: { ...process.env, VITE_API_ORIGIN: 'http://localhost:18082', VITE_LLM_MODE: 'mock', VITE_PAYMENT_MODE: 'disabled' },
       reuseExistingServer: false, timeout: 60_000,
     },
   ],

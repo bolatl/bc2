@@ -111,6 +111,32 @@ func (a *App) LoadFrom(path string) error {
 	return nil
 }
 
+// CheckPersistencePath verifies the directory supports the private temporary
+// files and atomic replacement used by autosave. It never opens, truncates, or
+// replaces the configured data file; all checks use uniquely named probe files.
+func CheckPersistencePath(path string) error {
+	if path == "" {
+		return errors.New("data file path is empty")
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("prepare data directory: %w", err)
+	}
+	probe, err := os.CreateTemp(dir, ".lovelab-probe-*.tmp")
+	if err != nil {
+		return fmt.Errorf("data directory is not writable: %w", err)
+	}
+	name := probe.Name()
+	defer os.Remove(name)
+	if err := probe.Close(); err != nil {
+		return fmt.Errorf("close data directory probe: %w", err)
+	}
+	if err := writeFileAtomic(name, []byte("persistence probe\n")); err != nil {
+		return fmt.Errorf("data directory does not support atomic writes: %w", err)
+	}
+	return nil
+}
+
 // StartAutosave writes the store to path shortly after every change and returns
 // a function that stops the writer after a final save.
 func (a *App) StartAutosave(path string) (stop func()) {

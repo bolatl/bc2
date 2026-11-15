@@ -12,20 +12,37 @@ import (
 
 type Config struct {
 	Addr, FrontendURL, SessionSecret, StripeSecretKey, LLMAPIKey, LLMProvider, LLMModel, LLMBaseURL, DataFile, Funnel string
+	Environment, StaticDir                                                                                            string
 	AllowedOrigins                                                                                                    []string
 	CookieSecure, EnableRehearsal, DisablePaywall, EnableCheckpoints                                                  bool
 	FreeTurns, MaxTurns, DivergenceThreshold                                                                          int
 }
 
 func Default() Config {
-	return Config{Addr: ":8080", FrontendURL: "http://localhost:5173", AllowedOrigins: []string{"http://localhost:5173"}, Funnel: "short", FreeTurns: 4, MaxTurns: 12, DivergenceThreshold: 4}
+	return Config{Environment: "development", Addr: ":8080", FrontendURL: "http://localhost:5173", AllowedOrigins: []string{"http://localhost:5173"}, Funnel: "short", FreeTurns: 4, MaxTurns: 12, DivergenceThreshold: 4}
 }
 func Load() (Config, error) {
 	c := Default()
-	for key, dst := range map[string]*string{"ADDR": &c.Addr, "FRONTEND_URL": &c.FrontendURL, "SESSION_SECRET": &c.SessionSecret, "STRIPE_SECRET_KEY": &c.StripeSecretKey, "LLM_API_KEY": &c.LLMAPIKey, "LLM_PROVIDER": &c.LLMProvider, "LLM_MODEL": &c.LLMModel, "LLM_BASE_URL": &c.LLMBaseURL, "DATA_FILE": &c.DataFile, "FUNNEL": &c.Funnel} {
+	for key, dst := range map[string]*string{"APP_ENV": &c.Environment, "STATIC_DIR": &c.StaticDir, "ADDR": &c.Addr, "FRONTEND_URL": &c.FrontendURL, "SESSION_SECRET": &c.SessionSecret, "STRIPE_SECRET_KEY": &c.StripeSecretKey, "LLM_API_KEY": &c.LLMAPIKey, "LLM_PROVIDER": &c.LLMProvider, "LLM_MODEL": &c.LLMModel, "LLM_BASE_URL": &c.LLMBaseURL, "DATA_FILE": &c.DataFile, "FUNNEL": &c.Funnel} {
 		if v := os.Getenv(key); v != "" {
 			*dst = v
 		}
+	}
+	// Render supplies its assigned HTTPS URL even on the free plan. An explicit
+	// FRONTEND_URL still wins, for example when a custom domain is configured.
+	if os.Getenv("FRONTEND_URL") == "" && os.Getenv("RENDER_EXTERNAL_URL") != "" {
+		c.FrontendURL = os.Getenv("RENDER_EXTERNAL_URL")
+	}
+	c.Environment = strings.ToLower(strings.TrimSpace(c.Environment))
+	if c.Environment != "development" && c.Environment != "test" && c.Environment != "production" {
+		return c, fmt.Errorf("APP_ENV must be development, test, or production")
+	}
+	if port := os.Getenv("PORT"); os.Getenv("ADDR") == "" && port != "" {
+		number, err := strconv.Atoi(port)
+		if err != nil || number < 1 || number > 65535 {
+			return c, fmt.Errorf("PORT must be an integer from 1 to 65535")
+		}
+		c.Addr = ":" + strconv.Itoa(number)
 	}
 	c.LLMProvider = strings.ToLower(strings.TrimSpace(c.LLMProvider))
 	if c.LLMProvider == "" && c.LLMAPIKey != "" && strings.HasPrefix(c.LLMAPIKey, "sk-ant-") {
@@ -89,6 +106,25 @@ func Load() (Config, error) {
 	if c.DivergenceThreshold < 1 || c.DivergenceThreshold > 9 {
 		return c, fmt.Errorf("DIVERGENCE_THRESHOLD must be 1..9")
 	}
+	if c.Environment == "production" {
+		if c.SessionSecret == "" {
+			return c, fmt.Errorf("SESSION_SECRET must be explicitly configured in production")
+		}
+		if !c.CookieSecure {
+			return c, fmt.Errorf("COOKIE_SECURE must be true in production")
+		}
+		if c.DataFile == "" {
+			return c, fmt.Errorf("DATA_FILE must be configured in production")
+		}
+		for _, origin := range append([]string{c.FrontendURL}, c.AllowedOrigins...) {
+			if !strings.HasPrefix(origin, "https://") {
+				return c, fmt.Errorf("FRONTEND_URL and ALLOWED_ORIGINS must use HTTPS in production")
+			}
+		}
+		if weakProductionSecret(c.SessionSecret) {
+			return c, fmt.Errorf("SESSION_SECRET must be at least 32 random characters, not a placeholder")
+		}
+	}
 	if c.DataFile != "" && c.SessionSecret == "" {
 		return c, fmt.Errorf("SESSION_SECRET is required when DATA_FILE is set: cookies must stay valid after a restart")
 	}
@@ -103,6 +139,23 @@ func Load() (Config, error) {
 		return c, fmt.Errorf("SESSION_SECRET must contain at least 32 characters")
 	}
 	return c, nil
+}
+
+func weakProductionSecret(secret string) bool {
+	if len(secret) < 32 || strings.ContainsAny(secret, " \t\r\n") {
+		return true
+	}
+	lower := strings.ToLower(secret)
+	for _, placeholder := range []string{"replace", "changeme", "change-me", "example", "your-secret"} {
+		if strings.Contains(lower, placeholder) {
+			return true
+		}
+	}
+	unique := map[rune]bool{}
+	for _, char := range secret {
+		unique[char] = true
+	}
+	return len(unique) < 8
 }
 func validURL(s string) error {
 	u, err := url.Parse(s)

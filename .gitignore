@@ -2,9 +2,22 @@
 .env
 .env.*
 !.env.example
+!.env.*.example
 .direnv/
 .venv/
 venv/
+.pypirc
+.netrc
+.aws/
+.ssh/
+/secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+*.credentials.json
+service-account*.json
 
 # Local dependency/tool caches
 node_modules/
@@ -17,15 +30,29 @@ __pycache__/
 
 # Local data file with couples, journal and private results
 /data/
+/backups/
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
+*.db-wal
+*.db-shm
+*.dump
 
 # Build and test output
 /bin/
+/build/
+/dist/
+/tmp/
+/temp/
 /coverage/
 /coverage.out
 *.test
 *.out
 *.prof
 *.tsbuildinfo
+*.tmp
+*.backup
 
 # Local multi-module Go workspace
 /go.work
