@@ -89,6 +89,9 @@ func (a *App) FightTurn(ctx context.Context, actor model.Actor, id string, req d
 	if f.Status != "in_progress" && f.Status != "awaiting_payment" {
 		return nil, conflict("This session no longer accepts answers.")
 	}
+	if f.Checkpoint != nil {
+		return nil, conflict("Answer the checkpoint first: continue or stop.")
+	}
 	// Inspect even a stale, card-labelled, or paywalled submission before any
 	// generation. Never persist the triggering text or change partner-visible data.
 	if safety.Check(req.AnswerText) || unsafeHistory(f) {
@@ -183,6 +186,19 @@ func (a *App) FightTurn(ctx context.Context, actor model.Actor, id string, req d
 	if next == "" || len(f.Turns) >= a.Config.MaxTurns {
 		return nil, conflict("The session reached its turn limit.")
 	}
+	if a.checkpointDue(f, next) {
+		if err = a.generateResult(ctx, c, &f); err != nil {
+			if errors.Is(err, errUnsafeFight) {
+				a.stopFight(&f, "stopped_safety")
+				return safetyResponse(), nil
+			}
+			return nil, a.generationError(err)
+		}
+		f.Checkpoint = &model.FightCheckpoint{AfterStage: f.Stage, FeltText: f.Result.FeltText, NeedText: f.Result.NeedText, OpeningLine: f.Result.OpeningLine}
+		f.Result, f.Current = nil, nil
+		a.Fights.Put(f.ID, f)
+		return a.fightView(c, f).CurrentTurn, nil
+	}
 	f.Stage = next
 	if err = a.nextQuestion(ctx, c, &f); err != nil {
 		if errors.Is(err, errUnsafeFight) {
@@ -201,6 +217,55 @@ func (a *App) FightTurn(ctx context.Context, actor model.Actor, id string, req d
 		}
 		f.Result.OpeningLine = ""
 		f.Status = "awaiting_payment"
+	}
+	a.Fights.Put(f.ID, f)
+	return a.fightView(c, f).CurrentTurn, nil
+}
+
+// checkpointDue reports whether an interim summary should follow the answered
+// stage. It is skipped on the free teaser and when only closing steps remain,
+// where "stop" and "continue" would lead to the same place.
+func (a *App) checkpointDue(f model.FightSession, next string) bool {
+	return a.Config.EnableCheckpoints && f.Tier == "full" && (f.Stage == "needs" || f.Stage == "partner_view") && next != "" && next != "thermometer_end" && next != "ready"
+}
+
+// FightCheckpoint resolves a pending checkpoint. "stop" skips the remaining
+// content stages and goes to the closing thermometer; "continue" resumes the
+// normal order.
+func (a *App) FightCheckpoint(ctx context.Context, actor model.Actor, id string, req dto.CheckpointRequest) (any, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	c, f, err := a.ownedFight(actor, id)
+	if err != nil {
+		return nil, err
+	}
+	if f.Status != "in_progress" || f.Checkpoint == nil {
+		return nil, conflict("There is no checkpoint to answer.")
+	}
+	if req.Decision != "continue" && req.Decision != "stop" {
+		return nil, invalid("decision must be continue or stop.")
+	}
+	next := "thermometer_end"
+	if req.Decision == "continue" {
+		stages := a.fightStages()
+		next = ""
+		for i, s := range stages {
+			if s == f.Checkpoint.AfterStage && i+1 < len(stages) {
+				next = stages[i+1]
+				break
+			}
+		}
+		if next == "" {
+			return nil, conflict("The session has no further stage.")
+		}
+	}
+	f.Stage, f.Checkpoint = next, nil
+	if err = a.nextQuestion(ctx, c, &f); err != nil {
+		if errors.Is(err, errUnsafeFight) {
+			a.stopFight(&f, "stopped_safety")
+			return safetyResponse(), nil
+		}
+		return nil, a.generationError(err)
 	}
 	a.Fights.Put(f.ID, f)
 	return a.fightView(c, f).CurrentTurn, nil
@@ -226,7 +291,7 @@ func (a *App) FightBack(ctx context.Context, actor model.Actor, id string, req d
 	index := *req.TurnIndex
 	target := f.Turns[index]
 	f.Turns = append([]model.FightTurn{}, f.Turns[:index]...)
-	f.Current = nil
+	f.Current, f.Checkpoint = nil, nil
 	f.Stage = target.Stage
 	f.Status = "in_progress"
 	f.Result = nil
@@ -280,6 +345,11 @@ func (a *App) FightResult(actor model.Actor, id string) (dto.FightSessionResultR
 	if err != nil {
 		return dto.FightSessionResultResponse{}, err
 	}
+	return a.resultView(actor, c, f)
+}
+
+// resultView builds the private result of f for actor; the caller holds a.mu.
+func (a *App) resultView(actor model.Actor, c model.Couple, f model.FightSession) (dto.FightSessionResultResponse, error) {
 	if f.Status == "stopped_safety" {
 		return dto.FightSessionResultResponse{}, fail(409, "safety_blocked", "This session was stopped privately.")
 	}
@@ -458,6 +528,7 @@ func (a *App) stopFight(f *model.FightSession, status string) {
 	f.Status = status
 	f.Turns = []model.FightTurn{}
 	f.Current = nil
+	f.Checkpoint = nil
 	f.Result = nil
 	f.NeutralTopic = ""
 	a.Fights.Put(f.ID, *f)
@@ -479,7 +550,9 @@ func (a *App) fightView(c model.Couple, f model.FightSession) dto.FightSessionRe
 	out := dto.FightSessionResponse{SessionID: f.ID, Status: f.Status, Tier: f.Tier, Stage: f.Stage, Turns: append([]model.FightTurn{}, f.Turns...), ThermometerStart: cp(f.ThermometerStart), ThermometerEnd: cp(f.ThermometerEnd), CreatedAt: f.CreatedAt}
 	switch f.Status {
 	case "in_progress":
-		if f.Current != nil {
+		if f.Checkpoint != nil {
+			out.CurrentTurn = dto.CheckpointResponse{Type: "checkpoint", AfterStage: f.Checkpoint.AfterStage, Summary: dto.CheckpointSummary{FeltText: f.Checkpoint.FeltText, NeedText: f.Checkpoint.NeedText, OpeningLine: f.Checkpoint.OpeningLine}, Question: "Does this feel right so far? You can stop here or keep going.", Decisions: []string{"stop", "continue"}}
+		} else if f.Current != nil {
 			turn := f.Current
 			var progress *int
 			index := map[string]int{"facts": 1, "feelings": 2, "needs": 3, "partner_view": 4, "rehearsal": 5, "ready": 6}[f.Stage]

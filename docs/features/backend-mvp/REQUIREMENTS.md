@@ -4,7 +4,7 @@
 
 This implementation follows the user's explicit precedence: `LoveLab_BACKEND_PROMPT.md` first, then `LoveLab_FINAL.md`, `LoveLab_PRODUCT_BRIEF.md`, and the historical `LoveLab_dev_flow_v0.md`. These source files are local inputs excluded from version control; the requirements needed for implementation are recorded in this documentation. Older proposals for registration, card collection before the teaser, SMS, and push delivery are not requirements. The requested deliverable includes implementation and the seven contract documents.
 
-The supplied workspace contained no Go skeleton or Item example. The requested `cmd/` and `internal/` structure is therefore created at the project root. Storage is in memory and restart durability is explicitly out of scope. The demo is a backend API; frontend screens, public deployment, repository publication, a pitch deck, and real payment collection are separate work.
+The supplied workspace contained no Go skeleton or Item example. The requested `cmd/` and `internal/` structure is therefore created at the project root. Storage is in memory. Optionally (`DATA_FILE`), a JSON snapshot of couples, subscriptions, personality results, completed sessions' derived results and the journal is kept on disk so history survives a restart; raw answers, generated questions and in-progress sessions are never written, and restart durability beyond that remains out of scope. The demo is a backend API; frontend screens, public deployment, repository publication, a pitch deck, and real payment collection are separate work.
 
 ## Confirmed behavior
 

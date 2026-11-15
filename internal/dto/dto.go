@@ -76,6 +76,28 @@ type SafetyStopResponse struct {
 	Type     string    `json:"type"`
 	Hotlines []Hotline `json:"hotlines"`
 }
+type CheckpointSummary struct {
+	FeltText    string `json:"feltText"`
+	NeedText    string `json:"needText"`
+	OpeningLine string `json:"openingLine"`
+}
+
+// CheckpointResponse offers an interim summary; the client answers with
+// POST /fight-sessions/{id}/checkpoint and a decision.
+type CheckpointResponse struct {
+	Type       string            `json:"type"`
+	AfterStage string            `json:"afterStage"`
+	Summary    CheckpointSummary `json:"summary"`
+	Question   string            `json:"question"`
+	Decisions  []string          `json:"decisions"`
+}
+type CheckpointRequest struct {
+	Decision string `json:"decision"`
+}
+type JournalEntryResponse struct {
+	model.FightRecord
+	MyResult *FightSessionResultResponse `json:"myResult"`
+}
 type CompletedResponse struct {
 	Type      string `json:"type"`
 	ResultURL string `json:"resultUrl"`

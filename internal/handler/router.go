@@ -41,6 +41,7 @@ func New(app *service.App) http.Handler {
 			r.Get("/fight-sessions/{sessionId}", h.fight)
 			r.Post("/fight-sessions/{sessionId}/turns", h.turn)
 			r.Post("/fight-sessions/{sessionId}/back", h.back)
+			r.Post("/fight-sessions/{sessionId}/checkpoint", h.checkpoint)
 			r.Post("/fight-sessions/{sessionId}/skip-topic", h.skip)
 			r.Get("/fight-sessions/{sessionId}/result", h.result)
 			r.Post("/subscriptions/checkout", h.checkout)
@@ -48,6 +49,7 @@ func New(app *service.App) http.Handler {
 			r.Get("/subscriptions/me", h.subscription)
 			r.Get("/journal", h.journal)
 			r.Get("/journal/stats", h.stats)
+			r.Get("/journal/{fightRecordId}", h.journalEntry)
 			r.Post("/journal/{fightRecordId}/rating", h.rating)
 		})
 	})
@@ -161,6 +163,16 @@ func (h *Handler) back(w http.ResponseWriter, r *http.Request) {
 	out, err := h.app.FightBack(r.Context(), actor, chi.URLParam(r, "sessionId"), req)
 	respond(w, 200, out, err)
 }
+func (h *Handler) checkpoint(w http.ResponseWriter, r *http.Request) {
+	var req dto.CheckpointRequest
+	if err := httpx.Decode(w, r, &req, false); err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	actor, _ := session.Actor(r.Context())
+	out, err := h.app.FightCheckpoint(r.Context(), actor, chi.URLParam(r, "sessionId"), req)
+	respond(w, 200, out, err)
+}
 func (h *Handler) skip(w http.ResponseWriter, r *http.Request) {
 	var req struct{}
 	if err := httpx.Decode(w, r, &req, true); err != nil {
@@ -204,6 +216,11 @@ func (h *Handler) subscription(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) journal(w http.ResponseWriter, r *http.Request) {
 	actor, _ := session.Actor(r.Context())
 	out, err := h.app.JournalList(actor)
+	respond(w, 200, out, err)
+}
+func (h *Handler) journalEntry(w http.ResponseWriter, r *http.Request) {
+	actor, _ := session.Actor(r.Context())
+	out, err := h.app.JournalGet(actor, chi.URLParam(r, "fightRecordId"))
 	respond(w, 200, out, err)
 }
 func (h *Handler) stats(w http.ResponseWriter, r *http.Request) {

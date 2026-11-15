@@ -15,6 +15,9 @@ node_modules/
 __pycache__/
 *.py[cod]
 
+# Local data file with couples, journal and private results
+/data/
+
 # Build and test output
 /bin/
 /coverage/

@@ -52,6 +52,14 @@ func main() {
 		llmMode = cfg.LLMProvider
 	}
 	app := service.New(cfg, generator, payments)
+	stopSaving := func() {}
+	if cfg.DataFile != "" {
+		if err := app.LoadFrom(cfg.DataFile); err != nil {
+			slog.Error("cannot load data file", "path", cfg.DataFile, "error", err)
+			os.Exit(1)
+		}
+		stopSaving = app.StartAutosave(cfg.DataFile)
+	}
 	server := &http.Server{Addr: cfg.Addr, Handler: handler.New(app), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -64,9 +72,10 @@ func main() {
 			slog.Error("shutdown failed", "error", err)
 			_ = server.Close()
 		}
+		stopSaving()
 		close(stopped)
 	}()
-	slog.Info("Love Lab backend listening", "address", cfg.Addr, "llm_mode", llmMode, "payment_mode", paymentMode)
+	slog.Info("Love Lab backend listening", "address", cfg.Addr, "llm_mode", llmMode, "data_file", cfg.DataFile, "payment_mode", paymentMode)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server failed", "error", err)
 		os.Exit(1)

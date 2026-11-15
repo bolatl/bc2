@@ -202,6 +202,40 @@ curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/skip-topic
 curl -X DELETE 'http://localhost:8080/api/v1/couples/me'
 ```
 
+## 10. Промежуточные проверки (нужен `ENABLE_CHECKPOINTS=true`)
+
+Перезапустите бэкенд с `ENABLE_CHECKPOINTS=true`. После ответа на этап `needs` (turnIndex 3) вместо следующего вопроса придёт промежуточный итог:
+
+```json
+{"type":"checkpoint","afterStage":"needs","summary":{"feltText":"...","needText":"...","openingLine":"..."},"question":"Does this feel right so far? You can stop here or keep going.","decisions":["stop","continue"]}
+```
+
+Пока проверка не закрыта, ходы `/turns` отвечают `409`. Остановиться: пропустить оставшиеся вопросы и перейти к финальному термометру (дальше `thermometer_end`, затем `ready`, как обычно):
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/checkpoint' -H 'Content-Type: application/json' -d '{"decision":"stop"}'
+```
+
+Продолжить обычный порядок (следующим придёт `partner_view`):
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/checkpoint' -H 'Content-Type: application/json' -d '{"decision":"continue"}'
+```
+
+## 11. Прошлые ссоры
+
+Список (как раньше) и одна ссора с вашим личным итогом (`myResult`); итога партнёра там нет:
+
+```bash
+curl 'http://localhost:8080/api/v1/journal'
+```
+
+```bash
+curl 'http://localhost:8080/api/v1/journal/<fightRecordId>'
+```
+
+Если задан `DATA_FILE`, журнал и итоги сохраняются в файл и остаются после перезапуска бэкенда (куки тоже, если задан постоянный `SESSION_SECRET`).
+
 ## Ошибки
 
 - `503 generation_unavailable`: OpenAI вернул ошибку (неверный ключ, лимит) или ответ не прошёл проверки; причина в stderr сервера.

@@ -21,6 +21,7 @@ Request JSON is a single object up to 32 KiB with unknown properties rejected. A
 | `GET /api/v1/fight-sessions/{sessionId}` | None | 200 | FightSessionResponse |
 | `POST /api/v1/fight-sessions/{sessionId}/turns` | SubmitTurnRequest | 200 | TurnResponse |
 | `POST /api/v1/fight-sessions/{sessionId}/back` | BackRequest | 200 | FightSessionResponse |
+| `POST /api/v1/fight-sessions/{sessionId}/checkpoint` | CheckpointRequest | 200 | TurnResponse |
 | `POST /api/v1/fight-sessions/{sessionId}/skip-topic` | EmptyRequest | 200 | FightSessionResponse |
 | `GET /api/v1/fight-sessions/{sessionId}/result` | None | 200 | FightSessionResultResponse |
 | `POST /api/v1/subscriptions/checkout` | CreateCheckoutRequest | 201 | CreateCheckoutResponse |
@@ -29,6 +30,7 @@ Request JSON is a single object up to 32 KiB with unknown properties rejected. A
 | `POST /api/v1/journal/{fightRecordId}/rating` | SubmitRatingRequest | 200 | FightRecordResponse |
 | `GET /api/v1/journal` | None | 200 | JournalResponse |
 | `GET /api/v1/journal/stats` | None | 200 | JournalStatsResponse |
+| `GET /api/v1/journal/{fightRecordId}` | None | 200 | JournalEntryResponse |
 
 Creation/join set a cookie; deletion expires it. `POST /fight-sessions` and `/skip-topic` accept `{}` or no body. All other POST requests require their listed JSON object. The only anonymous operations are create-couple, invitation preview, and invitation join. Invalid or disabled invite tokens return 404. A cannot use its own cookie to join B; replay after B is occupied conflicts unless the browser already has that B identity. `POST /subscriptions/*` is restricted to role A; B shares the paid entitlement.
 
@@ -53,6 +55,8 @@ Creation/join set a cookie; deletion expires it. `POST /fight-sessions` and `/sk
 - Only one outstanding round is coordinated at a time. A may start another round after both completed, or after A stopped/skipped with no active B. A stopped/skipped B may retry a fresh private session in the same round. A new unpaid attempt after consuming the free teaser requires payment. The shared journal record is created exactly once only when both are ready.
 - A rating updates the caller’s side. Explicit null means not discussed; a missing property is invalid. Two numeric ratings create an arithmetic mean; incomplete/not-discussed records remain gray. Mean <5 is red, 5–<8 yellow, and ≥8 green. Divergence compares raw ratings at the configured difference (default ≥4).
 - Journal rows and rating trend are oldest first and omits missing averages. The recurring-topic hint selects the most frequent topic appearing at least three times over the stored journal (lexicographic tie-break), not a date-filtered window.
+- Checkpoints (`ENABLE_CHECKPOINTS=true`, full tier only): after the `needs` stage, and after `partner_view` when a content stage (rehearsal) still follows, the answer to the turn returns `type: "checkpoint"` with an interim `summary` (`feltText`, `needText`, `openingLine`) instead of the next question. The same card is returned by `GET /fight-sessions/{id}` until resolved, and `/turns` answers conflict meanwhile. `POST .../checkpoint` with `{"decision":"continue"}` resumes the normal stage order; `{"decision":"stop"}` skips the remaining content stages and goes to `thermometer_end`, then `ready` completes as usual. A rewind (`/back`) clears a pending checkpoint. Disabled by default; clients unaware of the `checkpoint` branch never see it.
+- `GET /journal/{fightRecordId}` returns the shared record plus `myResult`, the caller's own private result for that round (or `null`). The partner's result is never included. Requires an active plan like the rest of the journal.
 - Terminal cleanup removes raw answers, questions, and cards. Only private derived results and shared journal aggregates remain until the couple is deleted. Personality answers are separate and may be retained.
 - Checkout confirmation is tied to the current couple and server-selected plan/amount. Only a verified paid test checkout activates access. Repeated valid confirmation is idempotent. A frontend redirect cannot activate access. Repeating checkout creation for the same pending plan returns the same ID/URL with 201; choosing a different plan while one is pending returns 409. A settled active couple cannot create another checkout.
 

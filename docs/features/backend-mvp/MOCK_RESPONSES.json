@@ -751,6 +751,87 @@
         "code": "generation_unavailable",
         "message": "The next step could not be prepared. Please try again."
       }
+    },
+    {
+      "name": "journal-entry",
+      "method": "GET",
+      "path": "/api/v1/journal/round_demo",
+      "status": 200,
+      "response": {
+        "id": "round_demo",
+        "topic": "chores",
+        "startedAt": "2026-11-15T04:00:00Z",
+        "bothReadyAt": "2026-11-15T04:10:00Z",
+        "ratingA": 9,
+        "ratingB": 5,
+        "averageRating": 7,
+        "color": "yellow",
+        "status": "rated",
+        "divergenceFlag": true,
+        "myResult": {
+          "sessionId": "session_a_demo",
+          "neutralTopic": "chores",
+          "feltText": "I felt alone and wanted to feel that we were a team.",
+          "needText": "I needed us to agree on one practical next step.",
+          "openingLine": "I want us to feel like a team. Could we agree on one small thing to do differently?",
+          "sharedRules": [
+            "Speak about your own feelings and make one clear request.",
+            "Let each person finish, then check that you understood.",
+            "Either person can ask for a pause and agree when to return."
+          ],
+          "partnerStatus": "ready",
+          "thermometerStart": 8,
+          "thermometerEnd": 3,
+          "tier": "full",
+          "locked": [],
+          "fightRecordId": "record_demo"
+        }
+      }
+    },
+    {
+      "name": "checkpoint-answer",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/checkpoint",
+      "status": 200,
+      "request": {
+        "decision": "continue"
+      },
+      "response": {
+        "type": "next_turn",
+        "stage": "partner_view",
+        "turnIndex": 4,
+        "agentQuestion": "Without assuming, what might your partner have been feeling?",
+        "optionLeft": "Maybe they were tired and overwhelmed",
+        "optionRight": "Maybe they wanted to feel understood too",
+        "progressStageIndex": 4,
+        "turnsUsed": 4,
+        "turnsMax": 12
+      }
+    },
+    {
+      "name": "checkpoint-offered",
+      "method": "POST",
+      "path": "/api/v1/fight-sessions/session_a_demo/turns",
+      "status": 200,
+      "request": {
+        "turnIndex": 3,
+        "answerSource": "free_text",
+        "answerText": "A clear plan"
+      },
+      "response": {
+        "type": "checkpoint",
+        "afterStage": "needs",
+        "summary": {
+          "feltText": "I felt alone and wanted to feel that we were a team.",
+          "needText": "I needed us to agree on one practical next step.",
+          "openingLine": "I want us to feel like a team. Could we agree on one small thing to do differently?"
+        },
+        "question": "Does this feel right so far? You can stop here or keep going.",
+        "decisions": [
+          "stop",
+          "continue"
+        ]
+      }
     }
   ]
 }

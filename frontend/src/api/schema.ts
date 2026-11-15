@@ -175,6 +175,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fight-sessions/{sessionId}/checkpoint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop at an interim summary or continue the session */
+        post: operations["answerCheckpoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fight-sessions/{sessionId}/skip-topic": {
         parameters: {
             query?: never;
@@ -303,6 +320,23 @@ export interface paths {
         };
         /** Read aggregates over shared records */
         get: operations["getJournalStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journal/{fightRecordId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one past conversation with the caller's own private result */
+        get: operations["getJournalEntry"];
         put?: never;
         post?: never;
         delete?: never;
@@ -512,7 +546,31 @@ export interface components {
             /** @description API path to the private session result. */
             resultUrl: string;
         };
-        TurnResponse: components["schemas"]["NextTurnResponse"] | components["schemas"]["PaywallResponse"] | components["schemas"]["SafetyStopResponse"] | components["schemas"]["CompletedResponse"];
+        CheckpointRequest: {
+            /**
+             * @description stop skips the remaining content stages and goes to the closing thermometer; continue resumes the normal order.
+             * @enum {string}
+             */
+            decision: "stop" | "continue";
+        };
+        CheckpointSummary: {
+            feltText: string;
+            needText: string;
+            openingLine: string;
+        };
+        CheckpointResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "checkpoint";
+            /** @enum {string} */
+            afterStage: "needs" | "partner_view";
+            summary: components["schemas"]["CheckpointSummary"];
+            question: string;
+            decisions: ("stop" | "continue")[];
+        };
+        TurnResponse: components["schemas"]["NextTurnResponse"] | components["schemas"]["PaywallResponse"] | components["schemas"]["SafetyStopResponse"] | components["schemas"]["CompletedResponse"] | components["schemas"]["CheckpointResponse"];
         FightTurn: {
             turnIndex: number;
             stage: components["schemas"]["FightStage"];
@@ -605,6 +663,33 @@ export interface components {
             status: components["schemas"]["RecordStatus"];
             /** @description True only with two numeric ratings whose difference reaches the configured threshold (default 4). */
             divergenceFlag: boolean;
+        };
+        JournalEntryResponse: {
+            /** @description Opaque server-generated identifier. Do not infer order or encode user data. */
+            id: string;
+            topic: components["schemas"]["FightTopic"];
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp in UTC.
+             */
+            startedAt: string;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp in UTC.
+             */
+            bothReadyAt: string | null;
+            /** @description Integer scale from 1 through 10. */
+            ratingA: number | null;
+            /** @description Integer scale from 1 through 10. */
+            ratingB: number | null;
+            /** @description Mean of both numeric ratings; absent average is null. */
+            averageRating: number | null;
+            color: components["schemas"]["RatingColor"];
+            status: components["schemas"]["RecordStatus"];
+            /** @description True only with two numeric ratings whose difference reaches the configured threshold (default 4). */
+            divergenceFlag: boolean;
+            /** @description The caller's own private result for this round, or null if unavailable. The partner's result is never included. */
+            myResult: components["schemas"]["FightSessionResultResponse"] | null;
         };
         /** @description Shared records oldest first (ID breaks equal timestamps); [] when empty. */
         JournalResponse: components["schemas"]["FightRecordResponse"][];
@@ -1452,6 +1537,113 @@ export interface operations {
             };
         };
     };
+    answerCheckpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckpointRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnResponse"];
+                };
+            };
+            /** @description Invalid or malformed JSON request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Anonymous session missing, invalid, or deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Actor or request origin is not permitted. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource missing, private to another actor, or invitation unavailable. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description State conflict, stale turn, occupied role, or incomplete payment. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request exceeds body size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Expected application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unexpected internal error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Next session step or result could not be generated. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     skipTopic: {
         parameters: {
             query?: never;
@@ -2057,6 +2249,73 @@ export interface operations {
             };
             /** @description Actor or request origin is not permitted. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unexpected internal error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getJournalEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fightRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryResponse"];
+                };
+            };
+            /** @description Anonymous session missing, invalid, or deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Active payment is required. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Actor or request origin is not permitted. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource missing, private to another actor, or invitation unavailable. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

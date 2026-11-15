@@ -11,10 +11,10 @@ import (
 )
 
 type Config struct {
-	Addr, FrontendURL, SessionSecret, StripeSecretKey, LLMAPIKey, LLMProvider, LLMModel, LLMBaseURL string
-	AllowedOrigins                                                                                  []string
-	CookieSecure, EnableRehearsal, DisablePaywall                                                   bool
-	FreeTurns, MaxTurns, DivergenceThreshold                                                        int
+	Addr, FrontendURL, SessionSecret, StripeSecretKey, LLMAPIKey, LLMProvider, LLMModel, LLMBaseURL, DataFile string
+	AllowedOrigins                                                                                            []string
+	CookieSecure, EnableRehearsal, DisablePaywall, EnableCheckpoints                                          bool
+	FreeTurns, MaxTurns, DivergenceThreshold                                                                  int
 }
 
 func Default() Config {
@@ -22,7 +22,7 @@ func Default() Config {
 }
 func Load() (Config, error) {
 	c := Default()
-	for key, dst := range map[string]*string{"ADDR": &c.Addr, "FRONTEND_URL": &c.FrontendURL, "SESSION_SECRET": &c.SessionSecret, "STRIPE_SECRET_KEY": &c.StripeSecretKey, "LLM_API_KEY": &c.LLMAPIKey, "LLM_PROVIDER": &c.LLMProvider, "LLM_MODEL": &c.LLMModel, "LLM_BASE_URL": &c.LLMBaseURL} {
+	for key, dst := range map[string]*string{"ADDR": &c.Addr, "FRONTEND_URL": &c.FrontendURL, "SESSION_SECRET": &c.SessionSecret, "STRIPE_SECRET_KEY": &c.StripeSecretKey, "LLM_API_KEY": &c.LLMAPIKey, "LLM_PROVIDER": &c.LLMProvider, "LLM_MODEL": &c.LLMModel, "LLM_BASE_URL": &c.LLMBaseURL, "DATA_FILE": &c.DataFile} {
 		if v := os.Getenv(key); v != "" {
 			*dst = v
 		}
@@ -50,7 +50,7 @@ func Load() (Config, error) {
 			return c, fmt.Errorf("ALLOWED_ORIGINS: %w", err)
 		}
 	}
-	for key, dst := range map[string]*bool{"COOKIE_SECURE": &c.CookieSecure, "ENABLE_REHEARSAL": &c.EnableRehearsal, "DISABLE_PAYWALL": &c.DisablePaywall} {
+	for key, dst := range map[string]*bool{"COOKIE_SECURE": &c.CookieSecure, "ENABLE_REHEARSAL": &c.EnableRehearsal, "DISABLE_PAYWALL": &c.DisablePaywall, "ENABLE_CHECKPOINTS": &c.EnableCheckpoints} {
 		if v := os.Getenv(key); v != "" {
 			b, err := strconv.ParseBool(v)
 			if err != nil {
@@ -80,6 +80,9 @@ func Load() (Config, error) {
 	}
 	if c.DivergenceThreshold < 1 || c.DivergenceThreshold > 9 {
 		return c, fmt.Errorf("DIVERGENCE_THRESHOLD must be 1..9")
+	}
+	if c.DataFile != "" && c.SessionSecret == "" {
+		return c, fmt.Errorf("SESSION_SECRET is required when DATA_FILE is set: cookies must stay valid after a restart")
 	}
 	if c.SessionSecret == "" {
 		var b [32]byte
