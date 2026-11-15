@@ -121,6 +121,7 @@ func checkpointApp(t *testing.T) (*App, model.Actor) {
 	t.Helper()
 	app, a, _ := fightApp(t, true)
 	app.Config.EnableCheckpoints = true
+	app.Config.Funnel = "full"
 	return app, a
 }
 
@@ -186,6 +187,7 @@ func TestCheckpointRewindClearsPendingAndFreeTierHasNone(t *testing.T) {
 	}
 	free, freeActor, _ := fightApp(t, false)
 	free.Config.EnableCheckpoints = true
+	free.Config.Funnel = "full"
 	g := startFight(t, free, freeActor)
 	for _, text := range []string{"8", "dishes", "alone"} {
 		answerFight(t, free, freeActor, g.SessionID, text)
@@ -203,4 +205,69 @@ func mustCouple(t *testing.T, app *App, a model.Actor) model.Couple {
 		t.Fatal("couple missing")
 	}
 	return c
+}
+
+func TestShortFunnelHasFiveQuestionsAndCheckpointAfterFeelings(t *testing.T) {
+	app, a, _ := fightApp(t, true)
+	if got := strings.Join(app.fightStages(), ","); got != "thermometer_start,facts,feelings,needs,ready" {
+		t.Fatalf("short funnel stages: %s", got)
+	}
+	app.Config.EnableCheckpoints = true
+	f := startFight(t, app, a)
+	for _, text := range []string{"8", "dishes"} {
+		answerFight(t, app, a, f.SessionID, text)
+	}
+	out := answerFight(t, app, a, f.SessionID, "alone")
+	if cp1, ok := out.(dto.CheckpointResponse); !ok || cp1.AfterStage != "feelings" {
+		t.Fatalf("expected a feelings checkpoint, got %#v", out)
+	}
+	next, err := app.FightCheckpoint(context.Background(), a, f.SessionID, dto.CheckpointRequest{Decision: "stop"})
+	if err != nil || next.(dto.NextTurnResponse).Stage != "ready" {
+		t.Fatalf("stop must jump to ready in the short funnel: %#v %v", next, err)
+	}
+	finishFight(t, app, a, f.SessionID)
+
+	// Without a checkpoint the session needs exactly five answers.
+	app2, a2, _ := fightApp(t, true)
+	g := startFight(t, app2, a2)
+	turns := 0
+	for getFight(t, app2, a2, g.SessionID).Status != "completed" {
+		answer := "8"
+		if getFight(t, app2, a2, g.SessionID).CurrentTurn.(dto.NextTurnResponse).Stage == "ready" {
+			answer = "I am ready to talk"
+		}
+		answerFight(t, app2, a2, g.SessionID, answer)
+		turns++
+		if turns > 6 {
+			t.Fatal("short funnel did not finish")
+		}
+	}
+	if turns != 5 {
+		t.Fatalf("short funnel took %d answers, want 5", turns)
+	}
+}
+
+func TestShortFunnelProgressIndexCountsContentStages(t *testing.T) {
+	app, _, _ := fightApp(t, true)
+	want := map[string]int{"facts": 1, "feelings": 2, "needs": 3, "ready": 4, "thermometer_start": 0}
+	for stage, n := range want {
+		if got := app.stageProgress(stage); got != n {
+			t.Fatalf("progress(%s)=%d want %d", stage, got, n)
+		}
+	}
+}
+
+func TestTypedAnswerIsLimited(t *testing.T) {
+	app, a, _ := fightApp(t, true)
+	f := startFight(t, app, a)
+	answerFight(t, app, a, f.SessionID, "8")
+	turn := getFight(t, app, a, f.SessionID).CurrentTurn.(dto.NextTurnResponse)
+	long := strings.Repeat("a", MaxAnswerChars+1)
+	if _, err := app.FightTurn(context.Background(), a, f.SessionID, dto.SubmitTurnRequest{TurnIndex: &turn.TurnIndex, AnswerSource: "free_text", AnswerText: long}); err == nil {
+		t.Fatal("over-long answer accepted")
+	}
+	ok := strings.Repeat("a", MaxAnswerChars)
+	if _, err := app.FightTurn(context.Background(), a, f.SessionID, dto.SubmitTurnRequest{TurnIndex: &turn.TurnIndex, AnswerSource: "free_text", AnswerText: ok}); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -1545,7 +1545,7 @@ components:
           type: string
           description: Required for free_text. For cards use the exact displayed card text or omit it; server resolves the
             stored card.
-          maxLength: 4000
+          maxLength: 300
       allOf:
       - if:
           properties:
@@ -1731,6 +1731,7 @@ components:
         afterStage:
           type: string
           enum:
+          - feelings
           - needs
           - partner_view
         summary:

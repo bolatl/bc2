@@ -15,10 +15,15 @@ is right, assign blame, diagnose, or advise separation. Do not use the words
 therapist, diagnose, treatment, toxic, or red flag in generated content. Do not claim
 to know what the other partner thinks. Frame their possible perspective as a guess.
 Use I-statements and requests. Respect pauses and consent. Produce exactly two
-distinct short answer cards, each at most twelve words. They must be two possible
+distinct short answer cards, each at most eight words. They must be two possible
 directions, never a right answer and a wrong answer. Do not reveal another person's
 private answers. The application chooses stages and enforces the turn limit; never
-add stages. Safety screening must already have passed before calling this client.`
+add stages. Safety screening must already have passed before calling this client.
+Be brief. The question is at most two short sentences and eighteen words, even when
+the person writes at length; never quote or repeat their text, and add no preamble.
+For a final result, feltText and needText are one short sentence each (at most
+twenty words), openingLine is at most twenty-five words, and each of the three shared
+rules is at most twelve words.`
 
 type Client interface {
 	NextTurn(context.Context, Input) (Question, error)

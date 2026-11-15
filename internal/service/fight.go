@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -226,7 +227,15 @@ func (a *App) FightTurn(ctx context.Context, actor model.Actor, id string, req d
 // stage. It is skipped on the free teaser and when only closing steps remain,
 // where "stop" and "continue" would lead to the same place.
 func (a *App) checkpointDue(f model.FightSession, next string) bool {
-	return a.Config.EnableCheckpoints && f.Tier == "full" && (f.Stage == "needs" || f.Stage == "partner_view") && next != "" && next != "thermometer_end" && next != "ready"
+	if !a.Config.EnableCheckpoints || f.Tier != "full" || next == "" || next == "thermometer_end" || next == "ready" {
+		return false
+	}
+	for _, stage := range a.checkpointStages() {
+		if f.Stage == stage {
+			return true
+		}
+	}
+	return false
 }
 
 // FightCheckpoint resolves a pending checkpoint. "stop" skips the remaining
@@ -245,7 +254,7 @@ func (a *App) FightCheckpoint(ctx context.Context, actor model.Actor, id string,
 	if req.Decision != "continue" && req.Decision != "stop" {
 		return nil, invalid("decision must be continue or stop.")
 	}
-	next := "thermometer_end"
+	next := a.closingStage()
 	if req.Decision == "continue" {
 		stages := a.fightStages()
 		next = ""
@@ -421,16 +430,68 @@ func (a *App) roundSessions(coupleID, roundID string) (*model.FightSession, *mod
 	}
 	return first, second
 }
+
+// MaxAnswerChars bounds a typed answer; short answers keep prompts, generated
+// follow-ups and the whole funnel short.
+const MaxAnswerChars = 300
+
+// fightStages returns the ordered stages of the configured funnel. The short
+// funnel asks four questions around one thermometer; the full one keeps the
+// partner-perspective stage and the closing thermometer.
 func (a *App) fightStages() []string {
-	stages := []string{"thermometer_start", "facts", "feelings", "needs", "partner_view"}
+	if a.Config.Funnel == "full" {
+		stages := []string{"thermometer_start", "facts", "feelings", "needs", "partner_view"}
+		if a.Config.EnableRehearsal {
+			stages = append(stages, "rehearsal")
+		}
+		return append(stages, "thermometer_end", "ready")
+	}
+	stages := []string{"thermometer_start", "facts", "feelings", "needs"}
 	if a.Config.EnableRehearsal {
 		stages = append(stages, "rehearsal")
 	}
-	return append(stages, "thermometer_end", "ready")
+	return append(stages, "ready")
+}
+
+// closingStage is the first closing step after the content stages.
+func (a *App) closingStage() string {
+	for _, s := range a.fightStages() {
+		if s == "thermometer_end" || s == "ready" {
+			return s
+		}
+	}
+	return "ready"
+}
+
+// checkpointStages are the stages after which an interim summary may be offered.
+func (a *App) checkpointStages() []string {
+	if a.Config.Funnel == "full" {
+		return []string{"needs", "partner_view"}
+	}
+	return []string{"feelings"}
+}
+
+// stageProgress numbers the content stages for the UI. The full funnel keeps its
+// historical fixed numbering; the short funnel counts the stages it actually has.
+func (a *App) stageProgress(stage string) int {
+	if a.Config.Funnel == "full" {
+		return map[string]int{"facts": 1, "feelings": 2, "needs": 3, "partner_view": 4, "rehearsal": 5, "ready": 6}[stage]
+	}
+	n := 0
+	for _, s := range a.fightStages() {
+		if s == "thermometer_start" || s == "thermometer_end" {
+			continue
+		}
+		n++
+		if s == stage {
+			return n
+		}
+	}
+	return 0
 }
 func turnAnswer(turn model.FightTurn, req dto.SubmitTurnRequest) (string, error) {
-	if utf8.RuneCountInString(req.AnswerText) > 4000 {
-		return "", invalid("answerText must contain at most 4000 characters.")
+	if utf8.RuneCountInString(req.AnswerText) > MaxAnswerChars {
+		return "", invalid(fmt.Sprintf("answerText must contain at most %d characters.", MaxAnswerChars))
 	}
 	switch req.AnswerSource {
 	case "card_left", "card_right":
@@ -555,7 +616,7 @@ func (a *App) fightView(c model.Couple, f model.FightSession) dto.FightSessionRe
 		} else if f.Current != nil {
 			turn := f.Current
 			var progress *int
-			index := map[string]int{"facts": 1, "feelings": 2, "needs": 3, "partner_view": 4, "rehearsal": 5, "ready": 6}[f.Stage]
+			index := a.stageProgress(f.Stage)
 			if index > 0 {
 				progress = &index
 			}

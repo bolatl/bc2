@@ -56,25 +56,13 @@ curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 
 curl 'http://localhost:8080/api/v1/fight-sessions/<sessionId>'
 ```
 
-Этап `partner_view` (turnIndex 4):
+Этап `ready` (turnIndex 4). После него сессия `completed` и генерируется итог:
 
 ```bash
-curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":4,"answerSource":"free_text","answerText":"Maybe they were tired too."}'
+curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":4,"answerSource":"free_text","answerText":"I am ready to talk"}'
 ```
 
-Этап `thermometer_end` (turnIndex 5):
-
-```bash
-curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":5,"answerSource":"free_text","answerText":"3"}'
-```
-
-Этап `ready` (turnIndex 6). После него сессия `completed` и генерируется итог:
-
-```bash
-curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":6,"answerSource":"free_text","answerText":"I am ready to talk"}'
-```
-
-Если включён `ENABLE_REHEARSAL=true`, между `partner_view` и `thermometer_end` добавляется этап `rehearsal`, а индексы сдвигаются на 1.
+Это короткая воронка (`FUNNEL=short`, по умолчанию): 5 вопросов, `turnIndex` 0–4. При `FUNNEL=full` (7 вопросов) после `needs` идут `partner_view` (turnIndex 4), `thermometer_end` (5, ответ числом от 1 до 10) и `ready` (6). Если включён `ENABLE_REHEARSAL=true`, добавляется этап `rehearsal` и индексы сдвигаются на 1. Свой текстовый ответ не длиннее 300 символов.
 
 ## 6. Что создалось
 
@@ -140,7 +128,7 @@ curl -X POST 'http://localhost:8080/api/v1/invites/<inviteToken>/join' -H 'Conte
 curl -X POST 'http://localhost:8080/api/v1/fight-sessions' -H 'Content-Type: application/json' -d '{}'
 ```
 
-Ходы B проходят так же, как у A (разделы 4 и 5): `POST /fight-sessions/<sessionIdB>/turns` с растущим `turnIndex` (0, 1, 2, …) до этапа `ready`. Пример хода:
+Ходы B проходят так же, как у A (разделы 4 и 5): `POST /fight-sessions/<sessionIdB>/turns` с растущим `turnIndex` (0, 1, 2, 3, 4) до этапа `ready`. Пример хода:
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionIdB>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":0,"answerSource":"free_text","answerText":"6"}'
@@ -204,19 +192,19 @@ curl -X DELETE 'http://localhost:8080/api/v1/couples/me'
 
 ## 10. Промежуточные проверки (нужен `ENABLE_CHECKPOINTS=true`)
 
-Перезапустите бэкенд с `ENABLE_CHECKPOINTS=true`. После ответа на этап `needs` (turnIndex 3) вместо следующего вопроса придёт промежуточный итог:
+Перезапустите бэкенд с `ENABLE_CHECKPOINTS=true`. В короткой воронке после ответа на этап `feelings` (turnIndex 2) вместо следующего вопроса придёт промежуточный итог (при `FUNNEL=full` проверка идёт после `needs`, turnIndex 3):
 
 ```json
-{"type":"checkpoint","afterStage":"needs","summary":{"feltText":"...","needText":"...","openingLine":"..."},"question":"Does this feel right so far? You can stop here or keep going.","decisions":["stop","continue"]}
+{"type":"checkpoint","afterStage":"feelings","summary":{"feltText":"...","needText":"...","openingLine":"..."},"question":"Does this feel right so far? You can stop here or keep going.","decisions":["stop","continue"]}
 ```
 
-Пока проверка не закрыта, ходы `/turns` отвечают `409`. Остановиться: пропустить оставшиеся вопросы и перейти к финальному термометру (дальше `thermometer_end`, затем `ready`, как обычно):
+Пока проверка не закрыта, ходы `/turns` отвечают `409`. Остановиться: пропустить оставшиеся вопросы и перейти к завершающему шагу (в короткой воронке сразу `ready`, в полной `thermometer_end`, затем `ready`):
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/checkpoint' -H 'Content-Type: application/json' -d '{"decision":"stop"}'
 ```
 
-Продолжить обычный порядок (следующим придёт `partner_view`):
+Продолжить обычный порядок (в короткой воронке следующим придёт `needs`):
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/checkpoint' -H 'Content-Type: application/json' -d '{"decision":"continue"}'

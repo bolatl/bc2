@@ -565,7 +565,7 @@ export interface components {
              */
             type: "checkpoint";
             /** @enum {string} */
-            afterStage: "needs" | "partner_view";
+            afterStage: "feelings" | "needs" | "partner_view";
             summary: components["schemas"]["CheckpointSummary"];
             question: string;
             decisions: ("stop" | "continue")[];

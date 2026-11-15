@@ -59,10 +59,10 @@ func TestOpenAIFixedStagesStayOffline(t *testing.T) {
 }
 
 func TestOpenAIRejectsBadOutput(t *testing.T) {
+	// Transport or contract violations surface as errors.
 	cases := map[string]string{
-		"forbidden word": `{"agentQuestion":"Talk to a therapist?","optionLeft":"A","optionRight":"B"}`,
-		"unknown field":  `{"agentQuestion":"Q","optionLeft":"A","optionRight":"B","extra":1}`,
-		"not json":       `hello`,
+		"unknown field": `{"agentQuestion":"Q","optionLeft":"A","optionRight":"B","extra":1}`,
+		"not json":      `hello`,
 	}
 	for name, content := range cases {
 		if _, err := fakeOpenAI(t, content, 200, nil).NextTurn(context.Background(), Input{Stage: "facts"}); err == nil {
@@ -71,6 +71,62 @@ func TestOpenAIRejectsBadOutput(t *testing.T) {
 	}
 	if _, err := fakeOpenAI(t, `{}`, 500, nil).NextTurn(context.Background(), Input{Stage: "facts"}); err == nil {
 		t.Fatal("status 500")
+	}
+}
+
+func TestVerboseOrProhibitedOutputIsRetriedThenReplacedByTemplate(t *testing.T) {
+	long := strings.Repeat("word ", MaxQuestionWords+1)
+	for name, content := range map[string]string{
+		"long question": `{"agentQuestion":"` + long + `","optionLeft":"A","optionRight":"B"}`,
+		"long card":     `{"agentQuestion":"Short?","optionLeft":"` + strings.Repeat("w ", MaxCardWords+1) + `","optionRight":"B"}`,
+		"prohibited":    `{"agentQuestion":"See a therapist?","optionLeft":"A","optionRight":"B"}`,
+	} {
+		calls := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			reply, _ := json.Marshal(map[string]any{"choices": []map[string]any{{"finish_reason": "stop", "message": map[string]string{"content": content}}}})
+			_, _ = w.Write(reply)
+		}))
+		c, _ := NewOpenAI("test-key", "", srv.URL, srv.Client())
+		q, err := c.NextTurn(context.Background(), Input{Stage: "facts"})
+		srv.Close()
+		if err != nil || calls != 2 {
+			t.Fatalf("%s: err=%v calls=%d", name, err, calls)
+		}
+		if q.OptionLeft == "A" || words(q.AgentQuestion) > MaxQuestionWords {
+			t.Fatalf("%s: model output reached the user: %+v", name, q)
+		}
+	}
+}
+
+func TestSecondShortAttemptIsAccepted(t *testing.T) {
+	replies := []string{
+		`{"agentQuestion":"` + strings.Repeat("word ", 30) + `","optionLeft":"A","optionRight":"B"}`,
+		`{"agentQuestion":"What happened?","optionLeft":"A","optionRight":"B"}`,
+	}
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if calls == 1 && !strings.Contains(string(body), "Be much shorter") {
+			t.Error("retry did not ask for a shorter answer")
+		}
+		reply, _ := json.Marshal(map[string]any{"choices": []map[string]any{{"finish_reason": "stop", "message": map[string]string{"content": replies[calls]}}}})
+		calls++
+		_, _ = w.Write(reply)
+	}))
+	t.Cleanup(srv.Close)
+	c, _ := NewOpenAI("test-key", "", srv.URL, srv.Client())
+	q, err := c.NextTurn(context.Background(), Input{Stage: "facts"})
+	if err != nil || q.AgentQuestion != "What happened?" || calls != 2 {
+		t.Fatalf("q=%+v err=%v calls=%d", q, err, calls)
+	}
+}
+
+func TestFinalResultTooLongFallsBackToTemplate(t *testing.T) {
+	long := strings.Repeat("word ", MaxSummaryWords+1)
+	r, err := fakeOpenAI(t, `{"feltText":"`+long+`","needText":"n","openingLine":"o","sharedRules":["a","b","c"]}`, 200, nil).FinalResult(context.Background(), Input{})
+	if err != nil || words(r.FeltText) > MaxSummaryWords || len(r.SharedRules) != 3 {
+		t.Fatalf("%+v %v", r, err)
 	}
 }
 
