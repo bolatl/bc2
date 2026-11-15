@@ -109,6 +109,7 @@ func cloneFight(f model.FightSession) model.FightSession {
 	f.Result = cp(f.Result)
 	if f.Result != nil {
 		f.Result.SharedRules = append([]string{}, f.Result.SharedRules...)
+		f.Result.Reflection = cloneReflection(f.Result.Reflection)
 	}
 	f.ThermometerStart = cp(f.ThermometerStart)
 	f.ThermometerEnd = cp(f.ThermometerEnd)

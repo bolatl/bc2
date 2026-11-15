@@ -621,6 +621,25 @@ export interface components {
             tier: components["schemas"]["SessionTier"];
             /** @description Empty when full access is available. */
             locked: ("openingLine" | "inviteUrl")[];
+            reflection?: components["schemas"]["ConversationReflection"];
+        };
+        /** @description Optional qualitative reflection based only on this partner's conversation and questionnaire context. Equal-size chart sectors represent themes, not measured percentages or personality scores. Absent for legacy results. */
+        ConversationReflection: {
+            /** @description Tentative summary of themes in this conversation; at most 35 words. Not a personality assessment. */
+            summary: string;
+            facets: components["schemas"]["ReflectionFacet"][];
+        };
+        /** @description A supported strength or a specific area to explore, never a diagnosis or a measured trait. Each id is unique within its reflection. */
+        ReflectionFacet: {
+            id: string;
+            /** @description Neutral context-specific label of at most five words, visible in the preview. */
+            label: string;
+            /** @enum {string} */
+            kind: "strength" | "growth";
+            /** @description Up to 45 words grounded in the owner's answers, visible in the preview. */
+            explanation: string;
+            /** @description Concrete optional action of at most 30 words; null without full access. */
+            practice: string | null;
         };
         CreateCheckoutRequest: {
             plan: components["schemas"]["Plan"];

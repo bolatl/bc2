@@ -1,22 +1,22 @@
 .conversation-page .preparation-guide { display: block; margin-top: 12px; }
 .sakura-journey { margin: 0 0 30px; }
-.journey-window { position: relative; isolation: isolate; overflow: hidden; margin: 0 -12px; border-radius: 50%; background: radial-gradient(ellipse at 50% 48%, rgb(233 195 184 / .28), transparent 69%); }
+.journey-window { position: relative; isolation: isolate; overflow: hidden; margin: 0 -12px; border-radius: 50%; background: radial-gradient(ellipse at 50% 48%, rgb(239 179 198 / .12), transparent 69%); }
 .journey-window svg { display: block; width: 100%; height: auto; overflow: hidden; }
 .journey-camera { transition: transform 1050ms cubic-bezier(.22, .68, .12, 1); will-change: transform; }
-.journey-branch-shadow { stroke: #dac9b9; stroke-width: 7; stroke-linecap: round; }
-.journey-branch { stroke: #8e7061; stroke-width: 3; stroke-linecap: round; }
-.journey-twig { stroke: #9c7b69; stroke-width: 1.5; stroke-linecap: round; }
-.journey-leaf { fill: #94a18a; fill-opacity: .55; }
+.journey-branch-shadow { stroke: var(--accent, #F0A04B); stroke-opacity: .45; stroke-width: 7; stroke-linecap: round; }
+.journey-branch { stroke: var(--branch, #493B39); stroke-width: 3; stroke-linecap: round; }
+.journey-twig { stroke: var(--branch-edge, #B18B69); stroke-width: 1.5; stroke-linecap: round; }
+.journey-leaf { fill: var(--leaf, #8EAA9D); fill-opacity: .55; }
 .journey-petals { transform-origin: 0 0; transition: transform 850ms cubic-bezier(.2, .8, .2, 1), opacity 700ms; }
-.journey-petals > path { fill: #eac2ba; stroke: #c7958e; stroke-width: .65; }
-.journey-blossom.is-current .journey-petals > path { fill: #edc3bf; stroke: #b77c7d; }
+.journey-petals > path { fill: var(--petal, #EFB3C6); stroke: var(--petal-edge, #C77D9B); stroke-width: .65; }
+.journey-blossom.is-current .journey-petals > path { fill: var(--petal-highlight, #F8D4DF); stroke: var(--accent, #F0A04B); }
 .journey-blossom:not(.is-open) .journey-petals { opacity: 0; }
-.journey-flower-center { fill: #b88469; }
-.journey-stamen path { stroke: #b9876e; stroke-width: .6; }
-.journey-stamen circle { fill: #b9876e; }
-.journey-bud { fill: #c79d94; }
-.journey-current-halo { fill: rgb(230 189 177 / .18); stroke: rgb(195 143 133 / .16); stroke-width: 1; }
-.journey-pollen { width: 7px; height: 11px; border-radius: 90% 15% 90% 20%; background: #dcb4ab; position: absolute; pointer-events: none; opacity: .45; animation: journey-drift 12s ease-in-out infinite; }
+.journey-flower-center { fill: var(--accent, #F0A04B); }
+.journey-stamen path { stroke: var(--accent, #F0A04B); stroke-width: .6; }
+.journey-stamen circle { fill: var(--accent, #F0A04B); }
+.journey-bud { fill: var(--petal-edge, #C77D9B); }
+.journey-current-halo { fill: rgb(240 160 75 / .12); stroke: var(--accent, #F0A04B); stroke-opacity: .58; stroke-width: 1; }
+.journey-pollen { width: 7px; height: 11px; border-radius: 90% 15% 90% 20%; background: var(--petal, #EFB3C6); position: absolute; pointer-events: none; opacity: .45; animation: journey-drift 12s ease-in-out infinite; }
 .journey-pollen-one { top: 28%; left: 19%; transform: rotate(-25deg); }
 .journey-pollen-two { top: 57%; right: 16%; width: 5px; height: 8px; animation-delay: -5s; }
 .sakura-journey figcaption { display: grid; gap: 6px; text-align: center; margin-top: -8px; position: relative; }

@@ -1,8 +1,8 @@
-/* The sakura drawing and warm paper palette carry across the whole app. */
+/* Presentation palette: midnight blue, gold accents, and pink sakura. */
 .sakura-backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .sakura-backdrop .sakura-bough { position: absolute; }
-.sakura-backdrop-right { width: 1150px; right: -580px; top: -170px; opacity: .21; transform: rotate(-12deg); }
-.sakura-backdrop-left { width: 1050px; left: -640px; bottom: -310px; opacity: .17; transform: rotate(168deg); }
+.sakura-backdrop-right { width: 1150px; right: -580px; top: -170px; opacity: .38; transform: rotate(-12deg); }
+.sakura-backdrop-left { width: 1050px; left: -640px; bottom: -310px; opacity: .24; transform: rotate(168deg); }
 .site-header { min-height: 98px; border-bottom-color: color-mix(in srgb, var(--rule) 80%, transparent); }
 .site-header nav a { font-size: 12px; font-weight: 500; padding-inline: 13px; }
 .site-header nav a.active { background: color-mix(in srgb, var(--surface) 86%, transparent); box-shadow: none; }
@@ -15,9 +15,8 @@
 .settings-link { padding: 8px; }
 .account-avatar { background: var(--you-soft); color: var(--you-ink); }
 .header-cta, .button { border-radius: 99px; }
-.button-primary { background: var(--ink); }
-.button-coral { background: var(--you-ink); color: var(--surface); }
-.button-coral:hover:not(:disabled) { background: #754149; }
+.header-cta, .button-primary, .button.primary, .button-coral { background: var(--accent); color: var(--on-accent); }
+.button-coral:hover:not(:disabled) { background: var(--accent-hover); }
 .button-secondary { background: color-mix(in srgb, var(--surface) 60%, transparent); }
 .page-heading h1 { font-weight: 400; letter-spacing: -.035em; }
 .page-number { font-weight: 400; font-size: 54px; color: var(--you-ink); }
@@ -40,10 +39,10 @@
 .example-icon { background: var(--bg); color: var(--you-ink); width: 33px; height: 33px; border-radius: 50%; }
 .example-label { background: var(--surface); border: 1px solid var(--rule); font-size: 10px; padding: 6px 12px; }
 .welcome-example h2 { font-size: 28px; font-weight: 400; margin: 0 0 28px 14px; }
-.example-sentence { box-shadow: 0 10px 30px -22px #705D4A55; border: 1px solid var(--rule); padding: 22px 24px; }
+.example-sentence { box-shadow: 0 10px 30px -22px rgb(8 17 34 / .55); border: 1px solid var(--rule); padding: 22px 24px; }
 .example-sentence-before { max-width: 78%; background: color-mix(in srgb, var(--surface) 95%, transparent); }
 .example-sentence-before blockquote { font-weight: 400; font-size: 24px; }
-.example-sentence-after { max-width: 88%; margin-left: auto; margin-top: 14px; background: #E8EDE1; }
+.example-sentence-after { max-width: 88%; margin-left: auto; margin-top: 14px; background: var(--partner-soft); }
 .example-sentence-after blockquote { font-weight: 400; font-size: 27px; font-style: italic; }
 .example-connector { justify-content: flex-end; margin: 14px 50px 6px; color: var(--you-ink); }
 .example-connector > span { width: 18px; }
@@ -58,7 +57,7 @@
 .welcome-faq-list summary { font-weight: 500; }
 .choose-card-copy strong { font-weight: 400; }
 .opening-card { background: var(--you-soft); }
-.preparation-steps li.current > span { background: var(--personal-ink); color: var(--surface); border-color: var(--personal-ink); }
+.preparation-steps li.current > span { background: var(--personal-ink); color: var(--on-accent); border-color: var(--personal-ink); }
 .summary-line, .checkpoint-opening blockquote { font-weight: 400 !important; font-style: italic; }
 .plan-price { font-family: var(--font-ui); }
 .paywall-benefits > .locked-preview { margin: 24px 0; }

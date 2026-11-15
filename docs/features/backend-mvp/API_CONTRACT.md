@@ -50,12 +50,15 @@ Creation/join set a cookie; deletion expires it. `POST /fight-sessions` and `/sk
 - A successful turn either returns the next question, pauses for payment, privately stops for safety, or completes with a result path. Stale or duplicate indexes cannot advance state.
 - Backtracking reopens an already answered index and erases its answer plus later branch data. Safety-stopped, skipped, and completed sessions cannot be resumed. Skip always erases raw text.
 - Safety checks precede every LLM operation. After a stop, no crisis message, diagnosis, stopped status, or raw answer is propagated to the other partner.
+- Follow-up generation receives this owner's prior questions, answer sources, and answers, with onboarding context and optional questionnaire trait levels. It anchors follow-ups to the described situation without repeating answered questions or attributing the partner's actions to the owner.
 - The result is available at the teaser paywall as a preview, or after completion. Before a preview exists it is a conflict; a saved preview may remain readable while the paid session continues. Unpaid previews use an empty `openingLine` and `locked: ["openingLine", "inviteUrl"]`. Completed full results have `locked: []`; a paid but unfinished preview still has both locks.
 - An invitation becomes shareable only after A has active payment and is ready. `inviteUrl` stays empty beforehand and for B. Joining requires the enabled opaque token. `partnerBInviteSentAt` means shareability in the current round, not proof of delivery; it resets when A starts a new round.
 - Only one outstanding round is coordinated at a time. A may start another round after both completed, or after A stopped/skipped with no active B. A stopped/skipped B may retry a fresh private session in the same round. A new unpaid attempt after consuming the free teaser requires payment. The shared journal record is created exactly once only when both are ready.
 - A rating updates the caller’s side. Explicit null means not discussed; a missing property is invalid. Two numeric ratings create an arithmetic mean; incomplete/not-discussed records remain gray. Mean <5 is red, 5–<8 yellow, and ≥8 green. Divergence compares raw ratings at the configured difference (default ≥4).
 - Journal rows and rating trend are oldest first and omits missing averages. The recurring-topic hint selects the most frequent topic appearing at least three times over the stored journal (lexicographic tie-break), not a date-filtered window.
 - Checkpoints (`ENABLE_CHECKPOINTS=true`, full tier only): in the short funnel after `feelings`; in the full funnel after `needs`, and after `partner_view` when a content stage (rehearsal) still follows, the answer to the turn returns `type: "checkpoint"` with an interim `summary` (`feltText`, `needText`, `openingLine`) instead of the next question. The same card is returned by `GET /fight-sessions/{id}` until resolved, and `/turns` answers conflict meanwhile. `POST .../checkpoint` with `{"decision":"continue"}` resumes the normal stage order; `{"decision":"stop"}` skips the remaining content stages and goes to the closing stage (`thermometer_end` in the full funnel, `ready` in the short one); `ready` completes as usual. A rewind (`/back`) clears a pending checkpoint. Disabled by default; clients unaware of the `checkpoint` branch never see it.
+- Results may include a `reflection`: three to five qualitative themes with no percentages or diagnostic labels. Preview summary, labels, and explanations are visible, while practice is JSON null until full access. The report is generated at the teaser paywall and final readiness step, not on reads or checkpoints, and only a completed derived report is persisted. Older results can omit it.
+- Result and reflection generation run concurrently and commit atomically. The reflection's own time budget or repeated invalid content can produce a basic answer-based reflection; its summary explicitly states that a detailed reflection could not be prepared. This is a successful response with the same access gates. Parent cancellation and other provider failures still return `503` without committing the answer. Generated prose is checked for respectful, non-graphic language even when the input is explicit.
 - `GET /journal/{fightRecordId}` returns the shared record plus `myResult`, the caller's own private result for that round (or `null`). The partner's result is never included. Requires an active plan like the rest of the journal.
 - Terminal cleanup removes raw answers, questions, and cards. Only private derived results and shared journal aggregates remain until the couple is deleted. Personality answers are separate and may be retained.
 - Checkout confirmation is tied to the current couple and server-selected plan/amount. Only a verified paid test checkout activates access. Repeated valid confirmation is idempotent. A frontend redirect cannot activate access. Repeating checkout creation for the same pending plan returns the same ID/URL with 201; choosing a different plan while one is pending returns 409. A settled active couple cannot create another checkout.
@@ -359,6 +362,24 @@ Fields in the following objects are required unless “No” appears in the requ
 | `thermometerEnd` | integer or null | Yes | minimum=1; maximum=10. Integer scale from 1 through 10. |
 | `tier` | [SessionTier](#sessiontier) | Yes |  |
 | `locked` | array of `openingLine`, `inviteUrl` | Yes | uniqueItems=True. Empty when full access is available. |
+| `reflection` | [ConversationReflection](#conversationreflection) | No | Optional for legacy results; caller-only derived themes with gated practice. |
+
+### ConversationReflection
+
+| Field | Type | Required | Constraints / meaning |
+|---|---|---|---|
+| `summary` | string | Yes | At most 35 words / 300 characters. Tentative themes in this conversation, not a personality assessment. |
+| `facets` | array of [ReflectionFacet](#reflectionfacet) | Yes | 3–5 distinct themes. Chart sectors are equal-size and have no measured weights. |
+
+### ReflectionFacet
+
+| Field | Type | Required | Constraints / meaning |
+|---|---|---|---|
+| `id` | string | Yes | Unique in this reflection; lowercase slug matching `^[a-z][a-z0-9_]{1,39}$`. |
+| `label` | string | Yes | At most 5 words / 60 characters; visible in the preview. |
+| `kind` | `strength` or `growth` | Yes | Supported strength or specific area to explore in this conversation. |
+| `explanation` | string | Yes | At most 45 words / 400 characters, based on the owner's answers; visible in preview. |
+| `practice` | string or null | Yes | At most 30 words / 260 characters; null before full access. |
 
 ### CreateCheckoutRequest
 
@@ -436,6 +457,6 @@ python3 -m venv /tmp/lovelab-contract-venv
 /tmp/lovelab-contract-venv/bin/python docs/features/backend-mvp/validate_contract.py
 ```
 
-The validator checks the 19 business routes against the Go router, schema references, JSON Schema validity, every mock request/response, full success coverage, and the OpenAPI 3.1 document.
+The validator checks the 21 business routes against the Go router, schema references, JSON Schema validity, every mock request/response, full success coverage, and the OpenAPI 3.1 document.
 
-To also validate real response bodies, start the backend in mock payment mode and append `--live-url http://localhost:8080` to that command. It exercises all 19 operations using a separate synthetic couple and deletes that couple afterward.
+To also validate real response bodies, start the backend in mock payment mode and append `--live-url http://localhost:8080` to that command. It exercises all 21 operations using a separate synthetic couple and deletes that couple afterward.

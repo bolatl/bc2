@@ -38,14 +38,18 @@ func NewAnthropic(apiKey, model, baseURL string, client *http.Client) (*Generato
 	return newGenerator(&anthropicClient{client: anthropic.NewClient(opts...), model: model}), nil
 }
 
-func (a *anthropicClient) complete(ctx context.Context, _ string, schema map[string]any, task string, in Input, dst any) error {
+func (a *anthropicClient) complete(ctx context.Context, name string, schema map[string]any, task string, in Input, dst any) error {
 	data, err := json.Marshal(promptData(in))
 	if err != nil {
 		return err
 	}
+	maxTokens := int64(1024)
+	if name == "conversation_reflection" {
+		maxTokens = 1800
+	}
 	msg, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(a.model),
-		MaxTokens: 1024,
+		MaxTokens: maxTokens,
 		System:    []anthropic.TextBlockParam{{Text: SystemPrompt}},
 		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock(userMessage(task, data)))},
 		OutputConfig: anthropic.OutputConfigParam{
@@ -57,17 +61,25 @@ func (a *anthropicClient) complete(ctx context.Context, _ string, schema map[str
 		// Surface only the status: API errors can echo prompt content.
 		var apiErr *anthropic.Error
 		if errors.As(err, &apiErr) {
+			logProviderFailure("anthropic", name, "http_status", "http_status", apiErr.StatusCode)
 			return fmt.Errorf("anthropic: unexpected status %d", apiErr.StatusCode)
 		}
+		logProviderTransportFailure("anthropic", name, ctx, err)
 		return err
 	}
 	if msg.StopReason != anthropic.StopReasonEndTurn {
+		logProviderFailure("anthropic", name, "unusable_completion", "stop_reason", safeCompletionReason(string(msg.StopReason)))
 		return fmt.Errorf("anthropic: no usable completion (stop_reason %q)", msg.StopReason)
 	}
 	for _, block := range msg.Content {
 		if text, ok := block.AsAny().(anthropic.TextBlock); ok {
-			return decodeStrict(text.Text, dst)
+			if err := decodeStrict(text.Text, dst); err != nil {
+				logProviderFailure("anthropic", name, "decode_content")
+				return err
+			}
+			return nil
 		}
 	}
+	logProviderFailure("anthropic", name, "empty_response")
 	return errors.New("anthropic: no text block in response")
 }

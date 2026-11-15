@@ -1950,6 +1950,63 @@ components:
             - inviteUrl
           description: Empty when full access is available.
           uniqueItems: true
+        reflection:
+          $ref: '#/components/schemas/ConversationReflection'
+    ConversationReflection:
+      type: object
+      additionalProperties: false
+      description: Optional qualitative reflection based only on this partner's conversation and questionnaire context. Equal-size chart sectors represent themes, not measured percentages or personality scores. Absent for legacy results.
+      required:
+      - summary
+      - facets
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: Tentative summary of themes in this conversation; at most 35 words. Not a personality assessment.
+        facets:
+          type: array
+          minItems: 3
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/ReflectionFacet'
+    ReflectionFacet:
+      type: object
+      additionalProperties: false
+      description: A supported strength or a specific area to explore, never a diagnosis or a measured trait. Each id is unique within its reflection.
+      required:
+      - id
+      - label
+      - kind
+      - explanation
+      - practice
+      properties:
+        id:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{1,39}$'
+        label:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: Neutral context-specific label of at most five words, visible in the preview.
+        kind:
+          type: string
+          enum:
+          - strength
+          - growth
+        explanation:
+          type: string
+          minLength: 1
+          maxLength: 400
+          description: Up to 45 words grounded in the owner's answers, visible in the preview.
+        practice:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 260
+          description: Concrete optional action of at most 30 words; null without full access.
     CreateCheckoutRequest:
       type: object
       additionalProperties: false

@@ -36,6 +36,18 @@ After restart, an incomplete session URL can return `404` and `currentSessionId`
 
 The browser must keep raw text and private results out of localStorage/sessionStorage. Server persistence of a completed result does not authorize copying it into persistent browser caches.
 
+## Contextual questions and conversation reflection
+
+The hosted generator receives the current owner's prior questions, answer sources, answers, selected onboarding context, and optional questionnaire trait levels. Follow-up questions should refer to the actual situation without repeating an answered question or guessing the partner's experience. Thermometers and readiness remain fixed controls. The offline mode uses context-aware rules rather than remote model calls; it does not claim equivalent depth to a hosted model.
+
+`FightSessionResultResponse.reflection` is optional for older results. When present, it contains a short `summary` and three to five `facets`. Each facet has `id`, `label`, `kind` (`strength` or `growth`), `explanation`, and `practice`. These are tentative themes from this conversation, not measured personality traits. Render equal-size chart sectors with no percentages or scores. Labels such as “aggressiveness” or “not willing to talk” are not supported conclusions; a reported pause is not a refusal to communicate.
+
+In the unpaid preview, summary, facet labels, and explanations are available, while `practice` is explicit JSON `null`. Blur decorative practical-step placeholders; never put withheld text in the DOM. Keep one plan-selection box beside the reflection panel. Full access returns practical steps as text, including for an existing preview; an older result with no reflection should show an honest unavailable state, not fabricated chart data. The report always belongs to the caller and contains no partner's private answers or profile.
+
+The reflection adds one hosted-model request when reaching the teaser paywall and one when completing the final readiness step, after safety screening. Result and reflection generate concurrently within a shared 25-second action deadline; reflection output has an 1800-token budget and a maximum 22-second budget, shortened to reserve response time. A content repair is attempted only if at least 12 seconds remain. Invalid or timed-out reflection content uses a basic, answer-based reflection whose summary explicitly identifies it as such; render that summary without hiding the qualification. Provider/configuration errors and parent cancellation still fail the request and leave the submitted turn uncommitted. Checkpoints do not request a separate reflection. Generation does not run again for GET requests. Only the completed derived report is persisted with `DATA_FILE`; raw answers remain excluded and incomplete sessions are not persisted. The existing 21 API operations remain unchanged; the schema now contains 56 components.
+
+Generated questions, cards, results, and reflection prose use respectful, non-graphic paraphrases. User-supplied profanity or explicit descriptions are not instructions to repeat that language. Invalid output is rewritten or replaced by a safe contextual template; this does not censor the user's own answer field.
+
 ## Mini-IPIP screen input
 
 Ask “How accurately does this describe you?” Use the scale 1 = Very inaccurate, 2 = Moderately inaccurate, 3 = Neither inaccurate nor accurate, 4 = Moderately accurate, 5 = Very accurate. Submit the original selected numbers without reversing them; scoring happens in the backend. Preserve this exact array order from the supplied project documents:
@@ -339,6 +351,21 @@ export interface FightSessionResultResponse {
   tier: SessionTier;
   /** Empty when full access is available. */
   locked: ("openingLine" | "inviteUrl")[];
+  /** Optional for older results. Practical steps are null until full access. */
+  reflection?: ConversationReflection;
+}
+
+export interface ConversationReflection {
+  summary: string;
+  facets: ReflectionFacet[];
+}
+
+export interface ReflectionFacet {
+  id: string;
+  label: string;
+  kind: "strength" | "growth";
+  explanation: string;
+  practice: string | null;
 }
 
 export interface CreateCheckoutRequest {

@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// forbiddenWords are banned from generated content by SystemPrompt; the model is
-// not trusted to obey, so every generated string is checked.
+// forbiddenWords are banned from generated content by SystemPrompt. Every
+// generated string is also checked by the respectful-language output guard.
 var forbiddenWords = []string{"therapist", "diagnos", "treatment", "toxic", "red flag"}
 
 // completer returns one strictly schema-bound JSON object decoded into dst.
@@ -61,7 +61,7 @@ const (
 	MaxSummaryWords  = 20
 	MaxOpeningWords  = 25
 	MaxRuleWords     = 12
-	tooLongReminder  = "Your previous answer broke the rules. Be much shorter: the question is at most two short sentences and 18 words, each card at most 8 words, no prohibited words."
+	tooLongReminder  = "Your previous answer broke the rules. Be much shorter: keep the question within two short sentences and 18 words, each card within 8 words. Rewrite any profanity, insults, slurs, or graphic details in respectful, neutral language without repeating them. Preserve the relevant meaning and responsibility; never shame either person."
 )
 
 func (g *Generator) NextTurn(ctx context.Context, in Input) (Question, error) {
@@ -70,19 +70,53 @@ func (g *Generator) NextTurn(ctx context.Context, in Input) (Question, error) {
 	default:
 		return g.fallback.NextTurn(ctx, in)
 	}
-	task := fmt.Sprintf("Write the next question for stage %q and its two answer cards.", in.Stage)
+	task := questionTask(in)
+	previousProblem := ""
 	for attempt := 0; attempt < 2; attempt++ {
 		var q Question
-		if err := g.c.complete(ctx, "question", questionSchema, retryTask(task, attempt), in, &q); err != nil {
+		request := retryTask(task, attempt)
+		if previousProblem != "" {
+			request += "\nCorrection needed: " + previousProblem + ". Re-read the history and ask a new, relevant question with two distinct answers."
+		}
+		if err := g.c.complete(ctx, "question", questionSchema, request, in, &q); err != nil {
 			return Question{}, err
 		}
-		if problem := questionProblem(q); problem == "" {
+		if problem := questionContextProblem(q, in); problem == "" {
 			return q, nil
 		} else {
+			previousProblem = problem
 			slog.Warn("generated question rejected", "stage", in.Stage, "attempt", attempt+1, "reason", problem)
 		}
 	}
 	return g.fallback.NextTurn(ctx, in)
+}
+
+func questionTask(in Input) string {
+	goal := map[string]string{
+		"facts":        "Ask what happened in one concrete moment, without guessing intentions. Before a situation is described, use profile topics only as optional prompts, never as known facts.",
+		"feelings":     "Build on the reported event and ask about its emotional impact. If feelings were already named, explore the most difficult part instead of asking them to name the same feeling again.",
+		"needs":        "Connect the feeling they reported to a specific need, request, or support in that event. Do not ask them to repeat the event or feeling.",
+		"partner_view": "Invite a curious question about their partner's experience of this event. Do not invent or state the partner's motives or feelings as facts.",
+		"rehearsal":    "Offer two natural opening lines that connect this event, the person's stated feeling, and their requested change. Respect any request for space or a later conversation.",
+	}[in.Stage]
+	return fmt.Sprintf("Write the next question for stage %q and its two answer cards. %s\n"+
+		"Read the complete owned conversation below. Anchor the question and both cards in a respectful, non-graphic concrete detail from the latest relevant answer. "+
+		"Prioritize free_text answers over profile defaults. A card selection records only the selected wording, not unmentioned events. "+
+		"Do not reuse a previous question or ask for information already given. If a detail is unclear, ask a focused clarification within this stage. "+
+		"Use a short, neutral paraphrase, not a quotation of the whole answer. If the event is explicit or humiliating, refer to its impact, consent, or boundaries without describing the act. Each card is a plausible response to this personalized question, not generic advice. "+
+		"Keep the question at most 18 words and each card at most 8 words.", in.Stage, goal)
+}
+
+func questionContextProblem(q Question, in Input) string {
+	if problem := questionProblem(q); problem != "" {
+		return problem
+	}
+	for _, turn := range in.Turns {
+		if turn.Question != "" && strings.EqualFold(strings.TrimSpace(q.AgentQuestion), strings.TrimSpace(turn.Question)) {
+			return "repeated previous question"
+		}
+	}
+	return ""
 }
 
 func retryTask(task string, attempt int) string {
@@ -94,6 +128,10 @@ func retryTask(task string, attempt int) string {
 
 func questionProblem(q Question) string {
 	switch {
+	case strings.TrimSpace(q.AgentQuestion) == "" || strings.TrimSpace(q.OptionLeft) == "" || strings.TrimSpace(q.OptionRight) == "":
+		return "empty question or card"
+	case strings.EqualFold(strings.TrimSpace(q.OptionLeft), strings.TrimSpace(q.OptionRight)):
+		return "duplicate cards"
 	case hasForbidden(q.AgentQuestion, q.OptionLeft, q.OptionRight):
 		return "prohibited word"
 	case words(q.AgentQuestion) > MaxQuestionWords:
@@ -156,7 +194,7 @@ func (g *Generator) FinalResult(ctx context.Context, in Input) (Result, error) {
 func promptData(in Input) map[string]any {
 	turns := make([]map[string]string, 0, len(in.Turns))
 	for _, t := range in.Turns {
-		turns = append(turns, map[string]string{"stage": t.Stage, "answer": t.AnswerText})
+		turns = append(turns, map[string]string{"stage": t.Stage, "question": t.Question, "answerSource": t.AnswerSource, "answer": t.AnswerText})
 	}
 	return map[string]any{
 		"stage":        in.Stage,
@@ -171,6 +209,9 @@ func promptData(in Input) map[string]any {
 
 func hasForbidden(texts ...string) bool {
 	for _, text := range texts {
+		if hasDisrespectfulLanguage(text) {
+			return true
+		}
 		lower := strings.ToLower(text)
 		for _, word := range forbiddenWords {
 			if strings.Contains(lower, word) {

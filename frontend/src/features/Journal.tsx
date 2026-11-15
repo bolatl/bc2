@@ -7,6 +7,7 @@ import type { Couple, Fight, FightRecord, Journal, JournalEntry, Personality, St
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page, Scale } from '../components/ui';
 import { LockedPreview } from '../components/LockedPreview';
+import { ConversationReflection } from '../components/ConversationReflection';
 import '../styles/journal.css';
 
 export function topicName(topic: string) { return ({ money: 'Money', chores: 'Sharing the chores', kids: 'Parenting', family: 'Family', phone: 'Phone time', jealousy: 'Jealousy', closeness: 'Feeling close', plans_decisions: 'Plans and decisions', time_attention: 'Time and attention', other: 'Something on your mind' } as Record<string, string>)[topic] ?? topic; }
@@ -233,6 +234,7 @@ export function JournalEntryPage() {
           </section>
           <div className="result-reflections"><section><HeartHandshake size={22} aria-hidden="true" /><h3>What you felt</h3><p>{result.feltText}</p></section><section><Sparkles size={22} aria-hidden="true" /><h3>What you needed</h3><p>{result.needText}</p></section></div>
           {result.sharedRules.length > 0 && <section className="result-rules"><div className="result-section-title"><HeartHandshake size={22} aria-hidden="true" /><h3>Make space for each other.</h3></div>{result.sharedRules.map((rule, index) => <div className="result-rule" key={`${index}-${rule}`}><span>{index + 1}</span><p>{rule}</p></div>)}</section>}
+          {result.reflection && <ConversationReflection reflection={result.reflection} />}
         </> : <Notice>Your personal summary is unavailable for this conversation. You can still view the shared details and add a check-in.</Notice>}
       </section>
       <aside className="result-sidebar">
