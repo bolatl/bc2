@@ -79,6 +79,9 @@ func (a *App) SubscriptionMe(actor model.Actor) (dto.SubscriptionResponse, error
 		return dto.SubscriptionResponse{}, err
 	}
 	s, ok := a.Subscriptions.Get(actor.CoupleID)
+	if !ok && a.Config.DisablePaywall {
+		return dto.SubscriptionResponse{Plan: defaultPlan(c), Status: "active"}, nil
+	}
 	if !ok {
 		return dto.SubscriptionResponse{Plan: defaultPlan(c), Status: "none"}, nil
 	}

@@ -1,6 +1,6 @@
 # Curl-запросы для ручной проверки (Postman)
 
-Сервер: `make run-env` (в логе `llm_mode=openai`, если задан `LLM_API_KEY`). Базовый адрес: `http://localhost:8080/api/v1`.
+Сервер: `make run-env`. В `.env` должно быть `DISABLE_PAYWALL=true` (оплата не нужна) и задан `LLM_API_KEY`; в логе `llm_mode=openai` или `anthropic`. Базовый адрес: `http://localhost:8080/api/v1`.
 
 **Как использовать в Postman:** `Import` → `Raw text` → вставить один curl → `Import`. Куки `lovelab_session` Postman сохраняет сам, поэтому `-c/-b` не нужны. Все запросы выполняйте в одной вкладке/коллекции, иначе потеряется сессия. Значения в `<...>` подставляйте из предыдущих ответов. Данные хранятся только в памяти сервера и пропадают после его перезапуска.
 
@@ -42,25 +42,13 @@ curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 
 curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":2,"answerSource":"free_text","answerText":"I felt alone with all the chores."}'
 ```
 
-Этап `needs` (turnIndex 3). После него придёт `paywall_required`, перейдите к шагу 5:
+Этап `needs` (turnIndex 3):
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":3,"answerSource":"free_text","answerText":"I wanted us to agree on a plan."}'
 ```
 
-## 5. Демо-оплата (мок, без Stripe-ключа)
-
-```bash
-curl -X POST 'http://localhost:8080/api/v1/subscriptions/checkout' -H 'Content-Type: application/json' -d '{"plan":"monthly"}'
-```
-
-Из ответа взять `checkoutSessionId`:
-
-```bash
-curl -X POST 'http://localhost:8080/api/v1/subscriptions/confirm' -H 'Content-Type: application/json' -d '{"checkoutSessionId":"<checkoutSessionId>"}'
-```
-
-## 6. Продолжить сессию после оплаты
+## 5. Завершить сессию
 
 Текущий вопрос (там же видно `stage` и `turnIndex`):
 
@@ -88,7 +76,7 @@ curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' -H 
 
 Если включён `ENABLE_REHEARSAL=true`, между `partner_view` и `thermometer_end` добавляется этап `rehearsal`, а индексы сдвигаются на 1.
 
-## 7. Что создалось
+## 6. Что создалось
 
 Итог сессии (текст, сгенерированный ChatGPT):
 
@@ -120,7 +108,7 @@ curl 'http://localhost:8080/api/v1/personality-tests/me'
 curl 'http://localhost:8080/api/v1/subscriptions/me'
 ```
 
-Журнал и статистика (записи появляются, только когда оба партнёра завершили раунд, см. разделы 8 и 9):
+Журнал и статистика (записи появляются, только когда оба партнёра завершили раунд, см. разделы 7 и 8):
 
 ```bash
 curl 'http://localhost:8080/api/v1/journal'
@@ -130,9 +118,9 @@ curl 'http://localhost:8080/api/v1/journal'
 curl 'http://localhost:8080/api/v1/journal/stats'
 ```
 
-## 8. Партнёр B и общий журнал
+## 7. Партнёр B и общий журнал
 
-Условия: A уже прошёл сессию до конца (`ready`) и оплатил. Запросы B делайте **с другой кукой**: в Postman в отдельном окне или после очистки кук, в curl с отдельным файлом (`-c b.jar -b b.jar`). Иначе сервер примет вас за A. Токен приглашения берётся из `inviteUrl` (кука A): последняя часть адреса.
+Условие: A уже прошёл сессию до конца (`ready`). Запросы B делайте **с другой кукой**: в Postman в отдельном окне или после очистки кук, в curl с отдельным файлом (`-c b.jar -b b.jar`). Иначе сервер примет вас за A. Токен приглашения берётся из `inviteUrl` (кука A): последняя часть адреса.
 
 Получить `inviteUrl` (кука A):
 
@@ -152,7 +140,7 @@ curl -X POST 'http://localhost:8080/api/v1/invites/<inviteToken>/join' -H 'Conte
 curl -X POST 'http://localhost:8080/api/v1/fight-sessions' -H 'Content-Type: application/json' -d '{}'
 ```
 
-Ходы B проходят так же, как у A (раздел 4 и 6): `POST /fight-sessions/<sessionIdB>/turns` с растущим `turnIndex` (0, 1, 2, …) до этапа `ready`. Отдельная оплата B не нужна, подписку оформляет A на пару. Пример хода:
+Ходы B проходят так же, как у A (разделы 4 и 5): `POST /fight-sessions/<sessionIdB>/turns` с растущим `turnIndex` (0, 1, 2, …) до этапа `ready`. Пример хода:
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionIdB>/turns' -H 'Content-Type: application/json' -d '{"turnIndex":0,"answerSource":"free_text","answerText":"6"}'
@@ -164,7 +152,7 @@ curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionIdB>/turns' -H
 curl 'http://localhost:8080/api/v1/fight-sessions/<sessionIdB>/result'
 ```
 
-## 9. Журнал, оценки и статистика
+## 8. Журнал, оценки и статистика
 
 Когда оба партнёра ответили на `ready`, создаётся общая запись. Дальше запросы можно делать с любой из двух кук.
 
@@ -194,7 +182,7 @@ curl 'http://localhost:8080/api/v1/journal/stats'
 
 Статус партнёра B виден у A в `GET /couples/me` (поле `partnerBStatus`) и в поле `partnerStatus` результата сессии.
 
-## 10. Дополнительно
+## 9. Дополнительно
 
 Вернуться на ход назад:
 

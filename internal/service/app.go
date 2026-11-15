@@ -54,7 +54,13 @@ func (a *App) couple(actor model.Actor) (model.Couple, error) {
 	}
 	return c, nil
 }
+
+// active reports whether the couple has full access. DISABLE_PAYWALL grants it
+// to every couple, so there is no teaser, and the journal and invite are open.
 func (a *App) active(coupleID string) bool {
+	if a.Config.DisablePaywall {
+		return true
+	}
 	s, ok := a.Subscriptions.Get(coupleID)
 	return ok && s.Status == "active"
 }

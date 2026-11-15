@@ -13,7 +13,7 @@ import (
 type Config struct {
 	Addr, FrontendURL, SessionSecret, StripeSecretKey, LLMAPIKey, LLMProvider, LLMModel, LLMBaseURL string
 	AllowedOrigins                                                                                  []string
-	CookieSecure, EnableRehearsal                                                                   bool
+	CookieSecure, EnableRehearsal, DisablePaywall                                                   bool
 	FreeTurns, MaxTurns, DivergenceThreshold                                                        int
 }
 
@@ -50,7 +50,7 @@ func Load() (Config, error) {
 			return c, fmt.Errorf("ALLOWED_ORIGINS: %w", err)
 		}
 	}
-	for key, dst := range map[string]*bool{"COOKIE_SECURE": &c.CookieSecure, "ENABLE_REHEARSAL": &c.EnableRehearsal} {
+	for key, dst := range map[string]*bool{"COOKIE_SECURE": &c.CookieSecure, "ENABLE_REHEARSAL": &c.EnableRehearsal, "DISABLE_PAYWALL": &c.DisablePaywall} {
 		if v := os.Getenv(key); v != "" {
 			b, err := strconv.ParseBool(v)
 			if err != nil {

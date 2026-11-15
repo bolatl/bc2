@@ -38,6 +38,7 @@
 | `LLM_PROVIDER` | авто | `openai` или `anthropic`. Если пусто, определяется по префиксу ключа (`sk-ant-` → Anthropic, иначе OpenAI) |
 | `LLM_MODEL` | зависит от провайдера | `claude-opus-5-5` для Anthropic, `gpt-4o-mini` для OpenAI |
 | `LLM_BASE_URL` | официальный API | Для прокси или совместимого сервера |
+| `DISABLE_PAYWALL` | `false` | `true`: оплата не нужна (см. ниже) |
 
 В логе старта поле `llm_mode` показывает `mock`, `openai` или `anthropic`. Неизвестное значение `LLM_PROVIDER` останавливает запуск с ошибкой.
 
@@ -49,6 +50,17 @@
 - `README.md` и `docs/features/backend-mvp/REQUIREMENTS.md`: обновлены описание LLM и таблица переменных.
 - `.gitignore`: собран заново (секреты, IDE, артефакты curl, скриншоты).
 - `go.mod` и `go.sum`: добавлен `anthropic-sdk-go/v2` и его зависимости.
+
+### Отключение пейвола (`DISABLE_PAYWALL`)
+
+Флаг `DISABLE_PAYWALL=true` (по умолчанию `false`) нужен для локальной проверки без оплаты. Единая точка проверки доступа `App.active()` (`internal/service/app.go`) при включённом флаге считает любую пару оплатившей. Из этого следует:
+
+- сессия сразу идёт в полном режиме (`tier: "full"`), без остановки после `FREE_TURNS` ответов;
+- приглашение партнёра B (`inviteUrl`) появляется, как только A закончил сессию;
+- B может начать сессию, журнал и статистика доступны без оплаты;
+- `GET /subscriptions/me` возвращает `status: "active"`, а `checkout` отвечает `409` (подписка уже активна).
+
+В `.env` флаг включён, в `.env.example` выключен. Тест: `TestDisablePaywallGivesFullAccessWithoutPayment`. Для боевого режима флаг нужно держать выключенным.
 
 ### Ограничения, о которых нужно знать
 
@@ -93,7 +105,7 @@
 2. `POST /personality-tests` (необязательно): 20 ответов, отчёт без LLM.
 3. `POST /fight-sessions` запускает сессию. В ответе `sessionId` и `currentTurn`.
 4. Цикл ходов: `POST /fight-sessions/{sessionId}/turns`.
-5. На пейволе (после `FREE_TURNS`, по умолчанию 4 ответа): `POST /subscriptions/checkout`, затем `POST /subscriptions/confirm`. Сессия продолжается с того же места.
+5. Если `DISABLE_PAYWALL=false`, на пейволе (после `FREE_TURNS`, по умолчанию 4 ответа) нужны `POST /subscriptions/checkout` и `POST /subscriptions/confirm`. При `DISABLE_PAYWALL=true` этого шага нет.
 6. После `ready` результат: `GET /fight-sessions/{sessionId}/result`.
 
 ### Ходы и карточки

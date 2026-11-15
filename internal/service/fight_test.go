@@ -510,3 +510,31 @@ func TestFightNextRoundUsesFreshAssociation(t *testing.T) {
 		t.Fatal("new round missing from journal")
 	}
 }
+
+func TestDisablePaywallGivesFullAccessWithoutPayment(t *testing.T) {
+	app, actor, _ := fightApp(t, false)
+	app.Config.DisablePaywall = true
+	first := startFight(t, app, actor)
+	if first.Tier != "full" {
+		t.Fatalf("expected full tier, got %q", first.Tier)
+	}
+	finishFight(t, app, actor, first.SessionID)
+	c, _ := app.Couples.Get(actor.CoupleID)
+	if !c.InviteEnabled {
+		t.Fatal("invite not enabled without payment")
+	}
+	b := addPartner(t, app, actor)
+	second := startFight(t, app, b)
+	finishFight(t, app, b, second.SessionID)
+	if _, err := app.JournalList(actor); err != nil {
+		t.Fatal(err)
+	}
+	result, err := app.FightResult(actor, first.SessionID)
+	if err != nil || result.OpeningLine == "" || len(result.Locked) != 0 {
+		t.Fatalf("unexpected result: %#v %v", result, err)
+	}
+	sub, err := app.SubscriptionMe(actor)
+	if err != nil || sub.Status != "active" {
+		t.Fatalf("unexpected subscription: %#v %v", sub, err)
+	}
+}
