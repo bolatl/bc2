@@ -61,6 +61,16 @@ type FightTurn struct {
 type FightResult struct {
 	FeltText, NeedText, OpeningLine string
 	SharedRules                     []string
+	Reflection                      *ConversationReflection
+}
+
+type ConversationReflection struct {
+	Summary string
+	Facets  []ReflectionFacet
+}
+
+type ReflectionFacet struct {
+	ID, Label, Kind, Explanation, Practice string
 }
 
 // FightCheckpoint is an interim summary offered mid-session. The partner may

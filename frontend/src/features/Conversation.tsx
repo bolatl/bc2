@@ -6,6 +6,7 @@ import type { Checkout, Couple, Fight, PlanOption, Result, Subscription, TurnRes
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page, Scale } from '../components/ui';
 import { LockedPreview } from '../components/LockedPreview';
+import { ConversationReflection } from '../components/ConversationReflection';
 import { SakuraJourney } from '../components/SakuraJourney';
 import { config } from '../config';
 import { useSpeechToText } from '../hooks/useSpeechToText';
@@ -332,6 +333,7 @@ export function ResultPage() {
         </section>
         <div className="result-reflections"><section><HeartHandshake size={22} aria-hidden="true" /><h2>What you felt</h2><p>{result.feltText}</p></section><section><Sparkles size={22} aria-hidden="true" /><h2>What you needed</h2><p>{result.needText}</p></section></div>
         <section className="result-rules"><div className="result-section-title"><UsersRound size={22} aria-hidden="true" /><h2>Make space for each other.</h2></div>{result.sharedRules.map((rule, index) => <div className="result-rule" key={rule}><span>{index + 1}</span><p>{rule}</p></div>)}</section>
+        {result.reflection && <ConversationReflection reflection={result.reflection} />}
       </div>
       <aside className="result-sidebar">
         {result.fightRecordId ? <section className="next-step"><span className="next-step-icon"><Check size={24} aria-hidden="true" /></span><p className="eyebrow">You’re both ready</p><h2>Take this into your conversation.</h2><p>When you’ve talked, come back and check in about how it went.</p><div className="actions"><Button onClick={() => navigate(`/journal/${result.fightRecordId}/rating`)}>Rate your conversation <ArrowRight size={18} aria-hidden="true" /></Button><Link to="/journal">View journal</Link></div></section>
@@ -419,15 +421,20 @@ export function PaywallPage() {
   if (subscription?.status === 'active') return <Page title="Your shared plan is active."><Link className="button button-primary" to={id ? `/fight-sessions/${id}` : '/home'}>Continue <ArrowRight size={18} /></Link></Page>;
   if (id && (fightResource.loading || resultResource.loading)) return <Loading label="Opening your first insight…" />;
   if (id && (!fightResource.data || !resultResource.data)) return <Page title="Your first insight"><Notice>{fightResource.error || resultResource.error || 'Your insight is not available yet.'}</Notice><div className="actions"><Button onClick={() => { void fightResource.load(); void resultResource.load(); }}>Try again</Button><Link to={`/fight-sessions/${id}`}>Return to conversation</Link></div></Page>;
-  return <Page eyebrow="One plan. Both of you." title="Keep the conversation going." layout="wide" className="paywall-page">
+  return <Page eyebrow="One plan. Both of you." title="Understand yourself. Find a way forward." description="Build on your strengths, understand the difficult moments, and make more room for each other." layout="wide" className="paywall-page">
     <div className="paywall-workspace">
-      <div className="paywall-benefits">
-        {resultResource.data && <section className="preview-insight"><span className="insight-symbol"><Sparkles size={26} aria-hidden="true" /></span><p className="eyebrow">Your first insight</p><h2>There’s something underneath it.</h2><div><span className="insight-label">What you felt</span><p>{resultResource.data.feltText}</p></div><div><span className="insight-label">What you needed</span><p>{resultResource.data.needText}</p></div><p className="locked-line"><LockKeyhole size={16} aria-hidden="true" /><span>Your opening words are next.</span></p></section>}
-        <LockedPreview variant="guide" compact action={<a className="button button-secondary" href="#choose-plan">Choose your plan<ArrowRight size={17} /></a>} />
-        <section className="plan-inclusions"><h2>Make room for both of you.</h2><p>Prepare on your own. Come back together with a clearer place to start.</p><ul><li><Check size={18} aria-hidden="true" /><span>Your complete preparation and personal conversation guide</span></li><li><Check size={18} aria-hidden="true" /><span>A free invitation for your partner to prepare privately</span></li><li><Check size={18} aria-hidden="true" /><span>Shared check-ins, your journal, and patterns over time</span></li></ul></section>
+      <div className="paywall-reflection-column">
+        <ConversationReflection
+          reflection={resultResource.data?.reflection}
+          locked
+          feltText={resultResource.data?.feltText}
+          needText={resultResource.data?.needText}
+          action={<a className="button button-secondary" href="#choose-plan">Explore your full reflection<ArrowRight size={17} /></a>}
+        />
       </div>
       <section className="plan-picker" id="choose-plan" aria-label="Choose a shared plan">
-        <div className="plan-picker-heading"><span className="plan-picker-icon"><UsersRound size={25} aria-hidden="true" /></span><div><h2>A little more understanding.</h2><p>One price for your couple.</p></div></div>
+        <div className="plan-picker-heading"><span className="plan-picker-icon"><UsersRound size={25} aria-hidden="true" /></span><div><h2>Put understanding into practice.</h2><p>One plan for both of your perspectives.</p></div></div>
+        <ul className="paywall-plan-benefits"><li><Check size={15} aria-hidden="true" /><span>Understand the strengths and challenges in your conversation</span></li><li><Check size={15} aria-hidden="true" /><span>Get practical ways to use your strengths and change unhelpful patterns</span></li><li><Check size={15} aria-hidden="true" /><span>Invite your partner to prepare privately, then check in together</span></li></ul>
         <div className="plan-grid" role="radiogroup" aria-label="Choose your plan">{plans.map(plan => <label key={plan.plan} className={`plan ${selectedPlan === plan.plan ? 'selected' : ''}`}><input className="sr-only" type="radio" name="plan" value={plan.plan} checked={selectedPlan === plan.plan} disabled={operation.busy || Boolean(pending && plan.plan !== selectedPlan)} onChange={() => setSelected(plan.plan)} /><span className="plan-radio" aria-hidden="true">{selectedPlan === plan.plan && <Check size={13} />}</span><span className="plan-description"><span className="plan-heading">{planCopy[plan.plan]?.title || plan.plan}</span><span>{planCopy[plan.plan]?.description}</span></span><span className="plan-price">${plan.priceUsd}<small>{planCopy[plan.plan]?.period}</small></span></label>)}</div>
         {pending && <Notice>Your checkout is still open. Resume it to complete the selected plan.</Notice>}
         {error && <Notice kind="error">{error}</Notice>}

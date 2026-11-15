@@ -114,18 +114,30 @@ type FightSessionResponse struct {
 	CreatedAt        time.Time         `json:"createdAt"`
 }
 type FightSessionResultResponse struct {
-	SessionID        string   `json:"sessionId"`
-	FightRecordID    *string  `json:"fightRecordId"`
-	NeutralTopic     string   `json:"neutralTopic"`
-	FeltText         string   `json:"feltText"`
-	NeedText         string   `json:"needText"`
-	OpeningLine      string   `json:"openingLine"`
-	SharedRules      []string `json:"sharedRules"`
-	PartnerStatus    string   `json:"partnerStatus"`
-	ThermometerStart *int     `json:"thermometerStart"`
-	ThermometerEnd   *int     `json:"thermometerEnd"`
-	Tier             string   `json:"tier"`
-	Locked           []string `json:"locked"`
+	SessionID        string                  `json:"sessionId"`
+	FightRecordID    *string                 `json:"fightRecordId"`
+	NeutralTopic     string                  `json:"neutralTopic"`
+	FeltText         string                  `json:"feltText"`
+	NeedText         string                  `json:"needText"`
+	OpeningLine      string                  `json:"openingLine"`
+	SharedRules      []string                `json:"sharedRules"`
+	PartnerStatus    string                  `json:"partnerStatus"`
+	ThermometerStart *int                    `json:"thermometerStart"`
+	ThermometerEnd   *int                    `json:"thermometerEnd"`
+	Tier             string                  `json:"tier"`
+	Locked           []string                `json:"locked"`
+	Reflection       *ConversationReflection `json:"reflection,omitempty"`
+}
+type ConversationReflection struct {
+	Summary string            `json:"summary"`
+	Facets  []ReflectionFacet `json:"facets"`
+}
+type ReflectionFacet struct {
+	ID          string  `json:"id"`
+	Label       string  `json:"label"`
+	Kind        string  `json:"kind"`
+	Explanation string  `json:"explanation"`
+	Practice    *string `json:"practice"`
 }
 type CreateCheckoutRequest struct {
 	Plan string `json:"plan"`

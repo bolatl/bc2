@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"lovelab/internal/dto"
@@ -16,9 +17,15 @@ import (
 
 var errUnsafeFight = errors.New("private safety stop")
 
+// A turn can require several provider calls and a content-repair retry. Bound
+// their combined duration below the HTTP server's thirty-second write timeout.
+const requestGenerationTimeout = 25 * time.Second
+
 // FightStart opens a private pass through the current round. Partner B only
 // receives a neutral topic; no A conversation is copied into B's context.
 func (a *App) FightStart(ctx context.Context, actor model.Actor) (dto.FightSessionResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestGenerationTimeout)
+	defer cancel()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	c, err := a.couple(actor)
@@ -81,6 +88,8 @@ func (a *App) FightGet(actor model.Actor, id string) (dto.FightSessionResponse, 
 }
 
 func (a *App) FightTurn(ctx context.Context, actor model.Actor, id string, req dto.SubmitTurnRequest) (any, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestGenerationTimeout)
+	defer cancel()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	c, f, err := a.ownedFight(actor, id)
@@ -150,7 +159,7 @@ func (a *App) FightTurn(ctx context.Context, actor model.Actor, id string, req d
 		f.NeutralTopic = topic
 	}
 	if f.Stage == "ready" {
-		if err = a.generateResult(ctx, c, &f); err != nil {
+		if err = a.generateResultWithReflection(ctx, c, &f); err != nil {
 			if errors.Is(err, errUnsafeFight) {
 				a.stopFight(&f, "stopped_safety")
 				return safetyResponse(), nil
@@ -209,7 +218,7 @@ func (a *App) FightTurn(ctx context.Context, actor model.Actor, id string, req d
 		return nil, a.generationError(err)
 	}
 	if f.Tier == "free_short" && len(f.Turns) >= a.Config.FreeTurns {
-		if err = a.generateResult(ctx, c, &f); err != nil {
+		if err = a.generateResultWithReflection(ctx, c, &f); err != nil {
 			if errors.Is(err, errUnsafeFight) {
 				a.stopFight(&f, "stopped_safety")
 				return safetyResponse(), nil
@@ -242,6 +251,8 @@ func (a *App) checkpointDue(f model.FightSession, next string) bool {
 // content stages and goes to the closing thermometer; "continue" resumes the
 // normal order.
 func (a *App) FightCheckpoint(ctx context.Context, actor model.Actor, id string, req dto.CheckpointRequest) (any, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestGenerationTimeout)
+	defer cancel()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	c, f, err := a.ownedFight(actor, id)
@@ -281,6 +292,8 @@ func (a *App) FightCheckpoint(ctx context.Context, actor model.Actor, id string,
 }
 
 func (a *App) FightBack(ctx context.Context, actor model.Actor, id string, req dto.BackRequest) (dto.FightSessionResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestGenerationTimeout)
+	defer cancel()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	c, f, err := a.ownedFight(actor, id)
@@ -386,7 +399,7 @@ func (a *App) resultView(actor model.Actor, c model.Couple, f model.FightSession
 	if record, ok := a.Journal.Get(f.RoundID); ok && record.CoupleID == c.ID && record.BothReadyAt != nil {
 		recordID = cp(&record.ID)
 	}
-	return dto.FightSessionResultResponse{SessionID: f.ID, FightRecordID: recordID, NeutralTopic: f.NeutralTopic, FeltText: f.Result.FeltText, NeedText: f.Result.NeedText, OpeningLine: opening, SharedRules: append([]string{}, f.Result.SharedRules...), PartnerStatus: partnerStatus, ThermometerStart: cp(f.ThermometerStart), ThermometerEnd: cp(f.ThermometerEnd), Tier: f.Tier, Locked: locked}, nil
+	return dto.FightSessionResultResponse{SessionID: f.ID, FightRecordID: recordID, NeutralTopic: f.NeutralTopic, FeltText: f.Result.FeltText, NeedText: f.Result.NeedText, OpeningLine: opening, SharedRules: append([]string{}, f.Result.SharedRules...), PartnerStatus: partnerStatus, ThermometerStart: cp(f.ThermometerStart), ThermometerEnd: cp(f.ThermometerEnd), Tier: f.Tier, Locked: locked, Reflection: reflectionView(f.Result.Reflection, a.active(c.ID))}, nil
 }
 
 func (a *App) ownedFight(actor model.Actor, id string) (model.Couple, model.FightSession, error) {
@@ -535,7 +548,7 @@ func (a *App) fightInput(c model.Couple, f model.FightSession) (llm.Input, error
 	turns := make([]llm.Turn, 0, len(f.Turns))
 	for _, turn := range f.Turns {
 		texts = append(texts, turn.AnswerText)
-		turns = append(turns, llm.Turn{Stage: turn.Stage, AnswerText: turn.AnswerText})
+		turns = append(turns, llm.Turn{Stage: turn.Stage, AnswerText: turn.AnswerText, Question: turn.AgentQuestion, AnswerSource: turn.AnswerSource})
 	}
 	if safety.CheckAll(texts...) {
 		return llm.Input{}, errUnsafeFight
@@ -569,15 +582,28 @@ func (a *App) generateResult(ctx context.Context, c model.Couple, f *model.Fight
 	if err != nil {
 		return err
 	}
-	result, err := a.LLM.FinalResult(ctx, input)
+	result, err := a.resultFromInput(ctx, input)
 	if err != nil {
 		return err
 	}
-	if result.FeltText == "" || result.NeedText == "" || result.OpeningLine == "" || len(result.SharedRules) != 3 {
-		return errors.New("incomplete generated result")
-	}
-	f.Result = &model.FightResult{FeltText: result.FeltText, NeedText: result.NeedText, OpeningLine: result.OpeningLine, SharedRules: append([]string{}, result.SharedRules...)}
+	f.Result = result
 	return nil
+}
+
+// resultFromInput does not touch session state and is safe to run alongside
+// reflection generation using the same read-only conversation input.
+func (a *App) resultFromInput(ctx context.Context, input llm.Input) (*model.FightResult, error) {
+	result, err := a.LLM.FinalResult(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	if result.FeltText == "" || result.NeedText == "" || result.OpeningLine == "" || len(result.SharedRules) != 3 {
+		return nil, errors.New("incomplete generated result")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return &model.FightResult{FeltText: result.FeltText, NeedText: result.NeedText, OpeningLine: result.OpeningLine, SharedRules: append([]string{}, result.SharedRules...)}, nil
 }
 func (a *App) generationError(err error) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
