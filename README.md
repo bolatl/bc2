@@ -4,6 +4,49 @@ API на Go 1.26 и chi для приватного разбора ссоры к
 
 Исходные продуктовые документы `LoveLab_*.md`, корневой `SKILL.md` и `Business_Cup_2.0_Brief.pdf` остаются локальными материалами и исключены из Git через `.gitignore`. Документация реализованного API находится в [`docs/features/backend-mvp/`](docs/features/backend-mvp/).
 
+## Все необходимые инструменты
+
+Ниже полный набор для запуска, разработки и проверок. Команды рассчитаны на Linux/macOS; в Windows используйте WSL2. Сначала установите системные инструменты, затем зависимости проекта командой `make setup` из корня.
+
+| Инструмент | Версия / установка | Для чего нужен |
+| --- | --- | --- |
+| [Git](https://git-scm.com/downloads) | Установленный Git | Клонирование и обновление репозитория |
+| [Go](https://go.dev/dl/) | **1.26**, как в [`go.mod`](go.mod) | Запуск, сборка и тесты API |
+| [Node.js и npm](https://nodejs.org/en/download) | **Node.js 24** из [`frontend/.nvmrc`](frontend/.nvmrc); также поддерживается Node 22.13+ в ветке 22. npm устанавливается вместе с Node | Интерфейс и его инструменты разработки |
+| [Python](https://www.python.org/downloads/) с `venv` и `pip` | **3.10+**, проверено на 3.13; нижняя граница задана [валидатором OpenAPI](https://pypi.org/project/openapi-spec-validator/0.8.5/). В Linux для `venv` может потребоваться пакет `python3-venv` | Проверка контракта и демонстрационные скрипты |
+| Make и POSIX shell | В Linux — GNU Make; Bash нужен для `scripts/curl_flow.sh` | Команды `make run`, `make setup`, `make check` и shell-скрипты |
+| Компилятор C | GCC/Clang для Linux/WSL; инструменты разработчика платформы для macOS | Проверки Go с `-race`; cgo должен быть включён. См. [требования Go](https://go.dev/doc/articles/race_detector#Requirements) |
+| Chromium для Playwright | Совместимую версию скачивает `make setup` | Автоматические браузерные тесты; обычный Chrome не заменяет эту установку |
+| curl | Нужен только для `scripts/curl_flow.sh` и ручных HTTP-запросов | Дополнительная проверка API |
+| Docker | Необязательно | Сборка и запуск бэкенда через [`Dockerfile`](Dockerfile) |
+
+Для ручной проверки интерфейса нужен браузер. База данных, Redis и аккаунты AI/Stripe для режима mock не нужны.
+
+Зависимости разных языков хранятся в файлах своих пакетных менеджеров:
+
+| Файлы | Что устанавливается |
+| --- | --- |
+| [`go.mod`](go.mod), [`go.sum`](go.sum) | chi, Anthropic SDK и остальные Go-модули |
+| [`frontend/package.json`](frontend/package.json), [`frontend/package-lock.json`](frontend/package-lock.json) | React, React Router, TanStack Query, Lucide, TypeScript, Vite, ESLint, Playwright и генератор API-типов |
+| [`requirements.txt`](requirements.txt) | PyYAML, jsonschema с проверкой форматов, referencing, валидатор OpenAPI и их зависимости |
+
+После установки системных инструментов выполните:
+
+```sh
+make setup
+```
+
+Команда загружает Go-модули, выполняет `npm ci` в `frontend/`, создаёт локальное окружение `.venv`, устанавливает Python-пакеты и Chromium. Серверы запускаются отдельно по инструкции ниже. Установить только часть зависимостей можно командами `make setup-go`, `make setup-frontend`, `make setup-python` или `make setup-browser` (последняя также устанавливает npm-пакеты).
+
+На свежем Linux/WSL для браузерных тестов дополнительно могут понадобиться системные библиотеки. После `make setup` установите их через [CLI Playwright](https://playwright.dev/docs/browsers#install-system-dependencies); команда может запросить права администратора:
+
+```sh
+cd frontend
+npx --no-install playwright install-deps chromium
+```
+
+`requirements.txt` остаётся корректным входом для `pip`: системные Go/Node/Make устанавливаются отдельно, а их полный список приведён выше и в комментарии файла. Версии JavaScript- и Go-зависимостей не нужно вручную дублировать в Python-файле.
+
 ## Запуск интерфейса
 
 Первый интерфейс находится в [`frontend/`](frontend/README.md): React, TypeScript и Vite. Нужен Node.js 22.13+ в ветке 22 или 24+ (рекомендуется 24). Для проверки без внешних API запустите два терминала из корня проекта.
@@ -112,15 +155,20 @@ python3 scripts/demo.py --delete-after
 - [План реализации бэкенда](docs/features/backend-mvp/BACKEND_PLAN.md)
 - [Критерии приёмки](docs/features/backend-mvp/ACCEPTANCE_CRITERIA.md)
 
+Python-зависимости для проверки контракта собраны в [`requirements.txt`](requirements.txt): `PyYAML`, `jsonschema` с проверкой форматов, `referencing` и `openapi-spec-validator` для полной проверки OpenAPI. Установите их в локальное виртуальное окружение; каталог `.venv/` уже исключён из Git:
+
 ```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python docs/features/backend-mvp/validate_contract.py
+
 go test -race ./...
 go vet ./...
 go build -o bin/lovelab ./cmd/server
-python3 docs/features/backend-mvp/validate_contract.py
 ```
 
-Для валидатора контракта нужны Python-пакеты `PyYAML` и `jsonschema`; для полной проверки документа OpenAPI дополнительно установите `openapi-spec-validator`. Прямые зависимости Go включают chi и Anthropic SDK. Тесты проверяют основной HTTP-сценарий, аутентификацию и права доступа, валидацию запросов, конкурентную отправку одного хода, порядок проверок безопасности, возврат к предыдущим шагам, продолжение после оплаты, подмену платёжных данных, разделение записей разных разборов, подсчёт баллов, оценки и удаление данных.
+Для работы приложения Python-пакеты не нужны: зависимости бэкенда описаны в `go.mod` и `go.sum`, фронтенда — в `frontend/package.json` и `frontend/package-lock.json`. Скрипт `scripts/demo.py` использует только стандартную библиотеку Python. Тесты проверяют основной HTTP-сценарий, аутентификацию и права доступа, валидацию запросов, конкурентную отправку одного хода, порядок проверок безопасности, возврат к предыдущим шагам, продолжение после оплаты, подмену платёжных данных, разделение записей разных разборов, подсчёт баллов, оценки и удаление данных.
 
-Для проверки ответов работающего сервера в режиме мока оплаты выполните `python3 docs/features/backend-mvp/validate_contract.py --live-url http://localhost:8080`. Проверка создаёт и удаляет тестовые пары. При локальной проверке реализации прошли сборка Go, `go vet`, тесты с детектором гонок, отдельный демонстрационный сценарий, полная проверка OpenAPI с 50 схемами и 40 примерами, а также проверка 61 HTTP-ответа по всем 19 эндпоинтам.
+Для проверки ответов работающего сервера в режиме мока оплаты выполните `.venv/bin/python docs/features/backend-mvp/validate_contract.py --live-url http://localhost:8080`. Проверка создаёт и удаляет тестовые пары. При локальной проверке реализации прошли сборка Go, `go vet`, тесты с детектором гонок, отдельный демонстрационный сценарий, полная проверка OpenAPI с 50 схемами и 40 примерами, а также проверка 61 HTTP-ответа по всем 19 эндпоинтам.
 
 Для сборки контейнера выполните `docker build -t lovelab-backend .`. Перед запуском настройте origin фронтенда и параметры cookie для HTTPS под целевое окружение. Сборка контейнера и развёртывание не входили в локальные проверки Go.

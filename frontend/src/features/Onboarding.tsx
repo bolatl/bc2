@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, ArrowUpRight, Check, ChevronLeft } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, HeartHandshake, Lightbulb, Link2, LockKeyhole, MessageCircle, MessageCircleHeart, ShieldCheck, Sparkles } from 'lucide-react';
 import { api, ApiError } from '../api/client';
 import type { CreateCouple, Fight, Invite, JoinInvite, Personality } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page } from '../components/ui';
 import { partnerQuestions, personalityQuestions, personalityScale, profileQuestions, type ProfileField, type ProfileQuestion } from '../content/profile';
+
+import '../styles/onboarding.css';
 
 type Answers = Partial<Record<ProfileField, string | string[]>>;
 
@@ -41,25 +43,51 @@ function useAction() {
 
 export function WelcomePage() {
   const { couple, loading, error, refresh } = useSession();
-  return <section className="hero">
-    <div className="hero-top"><p className="eyebrow">A little space to understand each other</p></div>
-    <h1 className="hero-title">Better conversations<br /> start <span>with you.</span></h1>
-    <div className="hero-bottom">
-      <div className="hero-copy">
-        <p className="lead">Work through what happened privately.<br />Find the words you want to start with.</p>
+  return <div className="welcome-page">
+    <section className="welcome-hero">
+      <div className="welcome-copy">
+        <p className="welcome-kicker"><span aria-hidden="true" />For the conversations that matter</p>
+        <h1>Better conversations<br />start <span>before<br className="welcome-break" /> you talk.</span></h1>
+        <p className="welcome-lead">A little space to understand what you feel, find the words, and come back to each other.</p>
         {error && <Notice kind="error">{error} <button className="text-link" onClick={() => { void refresh().catch(() => undefined); }}>Try connecting again</button></Notice>}
-        <div className="actions">
-          {loading ? <Loading label="Checking your session…" /> : <Link className="button button-primary" to={couple ? '/home' : '/onboarding'}>{couple ? 'Continue' : 'Get started'}<ArrowRight size={19} aria-hidden="true" /></Link>}
-          <span className="quiet">Start on your own. Invite your partner when you’re ready.</span>
+        <div className="welcome-actions">
+          {loading ? <Loading label="Checking your session…" /> : <Link className="button button-primary button-coral" to={couple ? '/home' : '/onboarding'}>{couple ? 'Continue' : 'Get started'}<ArrowRight size={19} aria-hidden="true" /></Link>}
+          <a href="#how-it-works" className="welcome-how-link">How it works<ChevronDown size={16} aria-hidden="true" /></a>
         </div>
+        <p className="welcome-private"><LockKeyhole size={14} aria-hidden="true" />Prepare privately. Invite your partner when you’re ready.</p>
       </div>
-      <div className="hero-steps" aria-label="How Love Lab works">
-        <div className="step-row"><span className="step-index">01</span><div><h2>Prepare separately</h2><p>Give your feelings and needs a little room.</p></div></div>
-        <div className="step-row"><span className="step-index">02</span><div><h2>Talk together</h2><p>Start with a first sentence that feels like you.</p></div></div>
-        <div className="step-row"><span className="step-index">03</span><div><h2>Check in</h2><p>Reflect on how the conversation went.</p></div></div>
+      <div className="welcome-example" aria-labelledby="example-heading">
+        <div className="example-heading-row"><span className="example-icon"><MessageCircleHeart size={24} aria-hidden="true" /></span><span className="example-label">Conversation example</span></div>
+        <h2 id="example-heading">Same moment.<br />A different way to start.</h2>
+        <div className="example-sentence example-sentence-before">
+          <span className="example-caption">When the words come out sharp</span>
+          <blockquote>“You never help.”</blockquote>
+          <span className="example-note">A criticism that leaves little room to talk.</span>
+        </div>
+        <div className="example-connector" aria-hidden="true"><span /><ArrowRight size={20} /><span /></div>
+        <div className="example-sentence example-sentence-after">
+          <span className="example-caption">With a little space to reflect</span>
+          <blockquote>“I felt alone tonight. Can we plan cleanup together?”</blockquote>
+          <span className="example-note"><Check size={15} aria-hidden="true" />Your experience, with a clear request.</span>
+        </div>
+        <div className="example-footer"><span className="example-overlap" aria-hidden="true"><i /><i /></span><p>Your side matters.<br /><strong>So does finding a way forward.</strong></p></div>
       </div>
-    </div>
-  </section>;
+    </section>
+    <section className="welcome-process" id="how-it-works" aria-labelledby="process-heading">
+      <div className="welcome-section-heading"><div><p className="eyebrow">A calmer way through</p><h2 id="process-heading">A little preparation. A better beginning.</h2></div><p>You don’t have to find all the right words at once.</p></div>
+      <div className="process-grid" aria-label="How Love Lab works">
+        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-you"><MessageCircle size={24} aria-hidden="true" /></span><span className="process-number">01</span></div><h3>Prepare separately</h3><p>Tell your side, explore what you feel, and understand what you need.</p></article>
+        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-partner"><HeartHandshake size={24} aria-hidden="true" /></span><span className="process-number">02</span></div><h3>Talk together</h3><p>Invite your partner to prepare too. Bring your own first sentence to the conversation.</p></article>
+        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-neutral"><Sparkles size={24} aria-hidden="true" /></span><span className="process-number">03</span></div><h3>Check in</h3><p>Reflect on how it went and see the patterns in your shared journal.</p></article>
+      </div>
+      <div className="welcome-trust"><span><ShieldCheck size={18} aria-hidden="true" />No verdict on who’s right</span><span><LockKeyhole size={18} aria-hidden="true" />Your raw answers stay private</span><span><Link2 size={18} aria-hidden="true" />One plan for both of you</span></div>
+    </section>
+    <section className="welcome-faq" id="questions" aria-labelledby="faq-heading"><div><p className="eyebrow">Before you begin</p><h2 id="faq-heading">A few things<br />you might wonder.</h2></div><div className="welcome-faq-list">
+      <details><summary>Does my partner need an account?<ChevronDown size={18} aria-hidden="true" /></summary><p>No. Share your invitation once your preparation is complete and your plan is active. Your partner opens it in their own browser, answers three questions, and prepares privately.</p></details>
+      <details><summary>Will my partner see what I write?<ChevronDown size={18} aria-hidden="true" /></summary><p>Your answers and personal guide are private. The shared journal contains the conversation topic, dates, and check-ins.</p></details>
+      <details><summary>Is Love Lab therapy?<ChevronDown size={18} aria-hidden="true" /></summary><p>Love Lab is an AI-powered educational tool for preparing a conversation. It is not therapy or a substitute for professional care.</p></details>
+    </div></section>
+  </div>;
 }
 
 function ProfileWizard({ questions, onComplete, busy, error, partner = false }: {
@@ -85,7 +113,8 @@ function ProfileWizard({ questions, onComplete, busy, error, partner = false }: 
     if (isLast) onComplete(answers);
     else setStep(step + 1);
   }
-  return <Page number={String(step + 1).padStart(2, '0')} eyebrow={`${partner ? 'Your own perspective' : 'A little about you'} · ${step + 1} of ${questions.length}`} title={question.title} description={question.description}>
+  return <Page className={`wizard-page ${partner ? 'wizard-partner' : ''}`} number={String(step + 1).padStart(2, '0')} eyebrow={`${partner ? 'Your own perspective' : 'A little about you'} · ${step + 1} of ${questions.length}`} title={question.title} description={question.description}>
+    <div className="wizard-progress" role="progressbar" aria-label="Profile questions" aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) / questions.length * 100}%` }} /></div>
     <form onSubmit={submit} className="stack">
       <fieldset className="form-field" disabled={busy}>
         <legend className="sr-only">{question.title}</legend>
@@ -101,7 +130,7 @@ function ProfileWizard({ questions, onComplete, busy, error, partner = false }: 
         <Button type="submit" disabled={busy || selected.length === 0}>{busy ? 'Saving…' : isLast ? 'Save and continue' : 'Continue'}<ArrowRight size={18} aria-hidden="true" /></Button>
         {step > 0 && <Button type="button" variant="text" disabled={busy} onClick={() => setStep(step - 1)}><ChevronLeft size={17} aria-hidden="true" />Back</Button>}
       </div>
-      <p className="quiet">{partner ? 'These answers are for your private preparation.' : 'Your answers help shape your private conversation.'} This form is saved when you finish.</p>
+      <p className="wizard-privacy"><LockKeyhole size={15} aria-hidden="true" /><span>{partner ? 'These answers are for your private preparation.' : 'Your answers help shape your private conversation.'} This form is saved when you finish.</span></p>
     </form>
   </Page>;
 }
@@ -149,17 +178,21 @@ export function ChoosePage() {
       throw err;
     }
   }
-  return <Page eyebrow="Make room for a conversation" title="Where would you like to start?" description="Start with what’s on your mind, or get to know your own patterns first.">
-    <div className="stack">
-      <button className="choice-card" disabled={busy} onClick={() => { void run(start); }}>
-        <span><span className="eyebrow">Your conversation</span><strong>{busy ? 'Getting ready…' : couple.currentSessionId ? 'Continue your conversation' : 'Talk to Love Lab now'}</strong><span>Take a moment to sort through what happened.</span></span><ArrowUpRight aria-hidden="true" />
+  return <Page className="choose-page" layout="wide" eyebrow="Make room for a conversation" title="Where would you like to start?" description="Start with what’s on your mind, or get to know your own patterns first.">
+    <div className="choose-grid">
+      <button className="choose-card choose-card-conversation" disabled={busy} onClick={() => { void run(start); }}>
+        <span className="choose-card-top"><span className="choose-icon"><MessageCircleHeart size={30} aria-hidden="true" /></span><span className="choose-pill">Start here</span></span>
+        <span className="choose-card-copy"><strong>{busy ? 'Getting ready…' : couple.currentSessionId ? 'Continue your conversation' : 'Talk to Love Lab now'}</strong><span>Make sense of what happened and find a first sentence that feels like you.</span></span>
+        <span className="choose-card-bottom">Your private preparation<ArrowUpRight size={23} aria-hidden="true" /></span>
       </button>
-      <Link className="choice-card" to={couple.personalityDone ? '/personality/result' : '/personality'}>
-        <span><span className="eyebrow">Your perspective</span><strong>{couple.personalityDone ? 'View your personal profile' : 'Take the 3-minute profile first'}</strong><span>20 short questions about how you tend to respond.</span></span><ArrowUpRight aria-hidden="true" />
+      <Link className="choose-card choose-card-profile" to={couple.personalityDone ? '/personality/result' : '/personality'}>
+        <span className="choose-card-top"><span className="choose-icon"><Lightbulb size={30} aria-hidden="true" /></span><span className="choose-pill">Optional</span></span>
+        <span className="choose-card-copy"><strong>{couple.personalityDone ? 'View your personal profile' : 'Take the 3-minute profile first'}</strong><span>Get to know the strengths and patterns you bring to a conversation.</span></span>
+        <span className="choose-card-bottom">20 short questions<ArrowUpRight size={23} aria-hidden="true" /></span>
       </Link>
-      {error && <Notice kind="error">{error}</Notice>}
-      <p className="quiet">The personal profile is optional. You can come back to it later.</p>
     </div>
+    {error && <Notice kind="error">{error}</Notice>}
+    <p className="choose-note"><LockKeyhole size={16} aria-hidden="true" />Both paths are private. You can come back to your profile at any time.</p>
   </Page>;
 }
 
@@ -183,7 +216,8 @@ export function PersonalityPage() {
       if (!signal.aborted) navigate('/personality/result', { replace: true });
     });
   }
-  return <Page number={String(step + 1).padStart(2, '0')} eyebrow={`Your profile · ${step + 1} of 20`} title={personalityQuestions[step]} description="How accurately does this describe you?">
+  return <Page className="wizard-page personality-page" number={String(step + 1).padStart(2, '0')} eyebrow={`Your profile · ${step + 1} of 20`} title={personalityQuestions[step]} description="How accurately does this describe you?">
+    <div className="wizard-progress" role="progressbar" aria-label="Personality questions" aria-valuemin={0} aria-valuemax={20} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) / 20 * 100}%` }} /></div>
     <form onSubmit={submit} className="stack">
       <fieldset className="form-field" disabled={busy}><legend className="sr-only">How accurately does this describe you?</legend>
         <div className="option-grid single-column">{personalityScale.map((label, index) => <label key={label} className={`option ${answers[step] === index + 1 ? 'selected' : ''}`}>
@@ -210,11 +244,12 @@ export function PersonalityResultPage() {
     <Notice>{query.error instanceof ApiError && query.error.status === 404 ? 'Take the personal profile to see your strengths and suggestions here.' : errorMessage(query.error)}</Notice>
     <div className="actions"><Link to="/personality" className="button button-primary">Take the profile<ArrowRight size={18} aria-hidden="true" /></Link><Button variant="text" onClick={() => { void query.refetch(); }}>Try again</Button></div>
   </Page>;
-  return <Page eyebrow="Your personal profile" title="A little more understanding. A place to begin." description="A few strengths to bring to your next conversation, and small things to try.">
-    <section className="stack"><h2 className="section-heading">What you bring</h2><ul className="insight-list">{query.data.strengths.map((text, index) => <li key={index}><Check size={20} aria-hidden="true" /><span>{text}</span></li>)}</ul></section>
-    <section className="stack section-block"><h2 className="section-heading">Something to try</h2><ol className="numbered-list">{query.data.tips.map((text, index) => <li key={index}>{text}</li>)}</ol></section>
-    <div className="actions"><Link to="/choose" className="button button-primary">Continue<ArrowRight size={18} aria-hidden="true" /></Link><Link to="/home" className="text-link">Back to home</Link></div>
-    <p className="quiet">This is a reflection tool, not a diagnosis or a label.</p>
+  return <Page className="personality-result-page" layout="wide" eyebrow="Your personal profile" title="A little more understanding. A place to begin." description="A few strengths to bring to your next conversation, and small things to try.">
+    <div className="profile-report-grid">
+      <section className="profile-report-card profile-report-strengths"><span className="report-icon"><Sparkles size={24} aria-hidden="true" /></span><h2>What you bring</h2><p className="profile-report-intro">Strengths to keep close in a difficult moment.</p><ul className="insight-list">{query.data.strengths.map((text, index) => <li key={index}><Check size={19} aria-hidden="true" /><span>{text}</span></li>)}</ul></section>
+      <section className="profile-report-card"><span className="report-icon"><Lightbulb size={24} aria-hidden="true" /></span><h2>Something to try</h2><p className="profile-report-intro">Small adjustments can make room for each other.</p><ol className="numbered-list">{query.data.tips.map((text, index) => <li key={index}>{text}</li>)}</ol></section>
+    </div>
+    <div className="profile-report-footer"><div className="actions"><Link to="/choose" className="button button-primary">Continue<ArrowRight size={18} aria-hidden="true" /></Link><Link to="/home" className="text-link">Back to home</Link></div><p className="quiet">This is a reflection tool, not a diagnosis or a label.</p></div>
   </Page>;
 }
 
@@ -239,7 +274,7 @@ export function InvitePage() {
   if (previewError) return <Page eyebrow="Partner invitation" title="Let’s find your invitation."><Notice>{previewError}</Notice><div className="actions"><Button onClick={() => setAttempt(attempt + 1)}>Try again</Button><Link className="text-link" to="/">Back to Love Lab</Link></div></Page>;
   if (!preview) return <Loading label="Opening your invitation…" />;
   return <>
-    <div className="invite-intro"><p className="eyebrow">An invitation to understand each other</p><p>{preview.message}</p></div>
+    <div className="invite-intro"><span className="invite-icon"><HeartHandshake size={26} aria-hidden="true" /></span><div><p className="eyebrow">An invitation to understand each other</p><p>{preview.message}</p></div><span className="invite-private"><LockKeyhole size={15} aria-hidden="true" />Your own perspective</span></div>
     <ProfileWizard partner questions={partnerQuestions} busy={busy} error={error} onComplete={(answers) => { void run(async (signal) => {
       try { await api<JoinInvite>(`/invites/${encodeURIComponent(token)}/join`, answers, { signal }); }
       catch (err) {

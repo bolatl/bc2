@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Validate the OpenAPI vocabulary and every request/response fixture.
 
-Requires PyYAML and jsonschema. If openapi-spec-validator is installed, also
-performs its complete OpenAPI 3.1 document validation. No server is contacted.
+Install the project's requirements.txt for PyYAML, jsonschema format checks,
+referencing, and complete OpenAPI 3.1 document validation. Without
+openapi-spec-validator, only the schema and fixture checks run.
+No server is contacted unless --live-url is supplied.
 """
 from pathlib import Path
 import json

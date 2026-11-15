@@ -44,6 +44,7 @@ telegram-cloud-photo-*
 .DS_Store
 Thumbs.db
 Desktop.ini
+*:Zone.Identifier
 *.swp
 *.swo
 *.bak
@@ -56,6 +57,7 @@ Desktop.ini
 /LoveLab_PRODUCT_BRIEF.md
 /SKILL.md
 /Business_Cup_2.0_Brief.pdf
+/LoveLab_prototype.html
 /backend_changes_v*.md
 /frontend.md
 /test.md

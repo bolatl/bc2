@@ -1,8 +1,8 @@
 import { useEffect, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { Settings2 } from 'lucide-react';
+import { ArrowUpRight, BookOpen, ChartNoAxesCombined, HeartHandshake, LockKeyhole, Settings2 } from 'lucide-react';
 import { useSession } from './session';
-import { Button, Loading, Notice, Page } from '../components/ui';
+import { BrandMark, Button, Loading, Notice, Page } from '../components/ui';
 import { WelcomePage, OnboardingPage, ChoosePage, PersonalityPage, PersonalityResultPage, InvitePage } from '../features/Onboarding';
 import { FightPage, ResultPage, PaywallPage, CheckoutSuccessPage, CheckoutCancelPage } from '../features/Conversation';
 import { HomePage, JournalPage, RatingPage, StatsPage, SettingsPage } from '../features/Journal';
@@ -18,12 +18,11 @@ function Protected({ children }: { children: ReactNode }) {
 export function App() {
   const { couple } = useSession();
   const location = useLocation();
-  const focused = /^\/(fight-sessions|onboarding|personality|invites)/.test(location.pathname);
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
-  return <div className="app-shell">
+  return <div className={`app-shell ${couple ? 'app-authenticated' : 'app-public'}`} data-partner={couple?.partnerRole || 'A'}>
     <a href="#main" className="skip-link">Skip to content</a>
-    <header className="site-header"><Link to={couple ? '/home' : '/'} className="brand" aria-label="Love Lab home"><span className="brand-mark" aria-hidden="true">L</span><span>Love Lab<span className="brand-dot">.</span></span></Link>
-      {couple ? <nav aria-label="Main navigation"><NavLink to="/home">Your space</NavLink>{!focused && <NavLink to="/journal">Journal</NavLink>}<NavLink to="/settings" className="settings-link" aria-label="Settings"><Settings2 size={19} /></NavLink></nav> : <span className="header-note">A better way to begin.</span>}
+    <header className="site-header"><Link to={couple ? '/home' : '/'} className="brand" aria-label="Love Lab home"><BrandMark size={40} /><span>love lab</span></Link>
+      {couple ? <><nav className="app-nav" aria-label="Main navigation"><NavLink to="/home"><HeartHandshake size={17} aria-hidden="true" />Your space</NavLink><NavLink to="/journal"><BookOpen size={17} aria-hidden="true" />Journal</NavLink><NavLink to="/stats"><ChartNoAxesCombined size={17} aria-hidden="true" />Patterns</NavLink></nav><div className="header-account"><span className="account-label"><LockKeyhole size={13} aria-hidden="true" />Your private space</span><NavLink to="/settings" className="settings-link" aria-label="Settings"><span className="account-avatar">{couple.partnerRole}</span><Settings2 size={17} aria-hidden="true" /></NavLink></div></> : <><nav className="public-nav" aria-label="Main navigation"><a href="/#how-it-works">How it works</a><a href="/#questions">Questions</a></nav><Link className="header-cta" to="/onboarding">Start a conversation<ArrowUpRight size={16} aria-hidden="true" /></Link></>}
     </header>
     {(config.llmMode === 'mock' || config.paymentMode === 'mock' || config.paymentMode === 'stripe_test') && <div className="mode-note">{[config.llmMode === 'mock' ? 'Demo responses' : null, config.paymentMode === 'mock' ? 'Simulated payment — no charge' : config.paymentMode === 'stripe_test' ? 'Test payment' : null].filter(Boolean).join(' · ')}</div>}
     <main id="main"><Routes>
@@ -45,6 +44,6 @@ export function App() {
       <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
       <Route path="*" element={<Page number="404" title="A different place to start."><p>This page isn’t available.</p><Link className="button button-primary" to={couple ? '/home' : '/'}>Back to Love Lab</Link></Page>} />
     </Routes></main>
-    <footer className="site-footer"><span className="footer-brand">A little more understanding.</span><p>Love Lab is an educational tool for couples. Your host is an AI, not a human or a therapist. It doesn’t diagnose and doesn’t replace counseling.</p><span className="footer-end">Love Lab</span></footer>
+    <footer className="site-footer"><div className="footer-brand"><BrandMark size={27} /><span>love lab</span></div><p>Love Lab is an educational tool for couples. Your host is an AI, not a human or a therapist. It doesn’t diagnose and doesn’t replace counseling.</p><span className="footer-end"><LockKeyhole size={14} aria-hidden="true" />Your words, your space.</span></footer>
   </div>;
 }
