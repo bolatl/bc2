@@ -278,3 +278,144 @@
   .rating-page .rating-aside > .feature-icon { width: 40px; height: 40px; border-radius: 12px; margin-bottom: 16px; }
   .rating-page .rating-aside h2 { font-size: 22px; }
 }
+
+/* Personal spaces: a quiet overview with clear ownership of each preparation. */
+.personal-space-page .space-switch { display: flex; gap: 5px; padding: 5px; margin: 0 0 30px; width: fit-content; max-width: 100%; background: var(--soft); border: 1px solid var(--rule); border-radius: 100px; }
+.space-switch a { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 10px 20px; min-height: 43px; border-radius: 100px; font-size: 13px; font-weight: 600; color: var(--ink-muted); }
+.space-switch a[aria-current='page'] { color: var(--ink); background: var(--surface); box-shadow: 0 2px 9px rgb(63 56 51 / 5%); }
+.personal-home-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(275px, 1fr); gap: 26px; align-items: stretch; }
+.personal-space-page .home-action { padding: 40px; background: var(--surface); border: 1px solid var(--rule); border-radius: 26px; min-height: 390px; box-shadow: 0 12px 35px rgb(63 56 51 / 3%); }
+.personal-space-page .home-action-top { margin-bottom: 38px; }
+.personal-space-page .home-action-top .feature-icon { background: var(--you-soft); border-radius: 50%; }
+.personal-space-page .home-action h2 { max-width: 490px; font-size: clamp(28px, 3vw, 37px); font-weight: 400; line-height: 1.2; }
+.personal-space-page .home-action > p:not(.eyebrow) { line-height: 1.8; margin: 17px 0 28px; font-size: 14px; }
+.personal-space-page .home-action .eyebrow { color: var(--ink-muted); }
+.personal-space-page .home-action .privacy-pill { background: var(--you-soft); color: var(--you-ink); font-size: 11px; }
+.personal-pair-card { display: flex; flex-direction: column; justify-content: center; background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.personal-card-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 22px; }
+.personal-card-heading > svg { color: var(--you-ink); }
+.personal-card-heading h2 { margin: 0; font-size: 23px; font-weight: 400; }
+.personal-pair-card .partner-status-row { padding: 21px 0; }
+.personal-pair-card > p { color: var(--ink-muted); font-size: 12px; line-height: 1.8; margin-top: 16px; }
+.personal-pair-card > .text-link { align-self: flex-start; font-size: 12px; }
+.personal-space-page .personal-home-links { margin-top: 26px; gap: 26px; }
+.personal-space-page .dashboard-link { padding: 27px 30px; border-radius: 22px; background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.personal-space-page .dashboard-link strong { font-weight: 400; font-size: 23px; }
+.personal-space-page .dashboard-link > span > span { font-size: 12px; line-height: 1.75; }
+.personal-space-page .dashboard-link > svg:last-child { width: 18px; }
+.personal-space-page .feature-icon { display: inline-flex; align-items: center; justify-content: center; width: 50px; height: 50px; flex: 0 0 auto; background: var(--you-soft); color: var(--you-ink); border-radius: 50%; }
+.personal-space-page .feature-icon-partner { background: var(--partner-soft); color: var(--partner-ink); }
+.personal-space-page .feature-icon-soft { background: var(--soft); color: var(--ink-muted); }
+
+.partner-space-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(270px, 1fr); gap: 26px; align-items: start; min-width: 0; }
+.partner-preparation-card { padding: 36px 40px; min-width: 0; }
+.partner-view-label { display: flex; align-items: center; gap: 13px; margin-bottom: 34px; }
+.partner-view-label > .person-badge { width: 54px; height: 54px; }
+.partner-view-label p { font-size: 12px; color: var(--ink-muted); margin: 4px 0 0; }
+.partner-view-label .eyebrow { font-size: 10px; }
+.readiness-badge { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 7px 10px; border-radius: 100px; font-size: 10px; color: var(--ink-muted); background: var(--soft); }
+.readiness-badge.is-ready { background: var(--partner-soft); color: var(--partner-ink); }
+.partner-preparation-card > h2 { font-size: 32px; font-weight: 400; }
+.partner-state-description { color: var(--ink-muted); font-size: 14px; line-height: 1.8; max-width: 490px; }
+.pair-readiness { display: flex; align-items: flex-start; justify-content: center; gap: 14px; padding: 32px 10px; margin: 22px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.pair-readiness > div { display: flex; flex-direction: column; align-items: center; text-align: center; width: 125px; min-width: 0; flex-shrink: 1; }
+.pair-readiness .person-badge { width: 62px; height: 62px; margin-bottom: 13px; }
+.pair-readiness strong { font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+.pair-readiness > div > span:last-child { font-size: 11px; color: var(--ink-muted); }
+.pair-readiness-connection { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--you-ink); flex: 1; max-width: 120px; margin-top: 22px; }
+.pair-readiness-connection::before, .pair-readiness-connection::after { content: ''; height: 1px; flex: 1; background: var(--rule); }
+.partner-space-aside { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; min-width: 0; }
+.partner-space-aside > *, .partner-view-label > div, .partner-journal-link > span { min-width: 0; }
+.partner-privacy-card { background: var(--partner-soft); border-radius: 24px; padding: 30px; }
+.partner-privacy-card > svg { color: var(--partner-ink); margin-bottom: 22px; }
+.partner-privacy-card h2 { font-size: 28px; font-weight: 400; line-height: 1.2; }
+.partner-privacy-card p { font-size: 13px; line-height: 1.8; color: var(--ink-muted); }
+.partner-privacy-card .text-link { font-size: 12px; }
+.personal-space-page .partner-journal-link { align-items: flex-start; padding: 26px; gap: 16px; }
+.partner-journal-link > svg:first-child { margin-top: 3px; color: var(--partner-ink); }
+.invite-copy-field { display: block; margin-top: 24px; font-size: 12px; color: var(--ink-muted); }
+.partner-progress { list-style: none; display: flex; padding: 0; margin: 28px 0 8px; gap: 8px; }
+.partner-progress li { flex: 1; display: flex; flex-direction: column; gap: 8px; color: var(--ink-muted); font-size: 11px; line-height: 1.6; }
+.partner-progress li::before { content: ''; display: block; width: 100%; height: 3px; border-radius: 10px; background: var(--rule); }
+.partner-progress li.reached::before { background: var(--partner); }
+.partner-progress li[aria-current='step'] { color: var(--partner-ink); font-weight: 600; }
+
+.profile-workspace { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 28px; align-items: start; }
+.profile-identity-card { text-align: center; padding: 34px 25px; }
+.profile-avatar { display: inline-grid; place-items: center; width: 86px; height: 86px; margin-bottom: 22px; border-radius: 50%; color: var(--you-ink); background: var(--you-soft); border: 7px solid var(--surface); outline: 1px solid var(--rule); }
+.profile-identity-card h2 { font-size: 33px; font-weight: 400; margin-bottom: 9px; }
+.profile-role { font-size: 11px; background: var(--soft); color: var(--ink-muted); padding: 6px 12px; border-radius: 100px; }
+.profile-identity-card > p { font-size: 12px; color: var(--ink-muted); line-height: 1.8; margin: 22px auto; max-width: 180px; }
+.profile-identity-card dl { margin: 0; text-align: left; border-top: 1px solid var(--rule); }
+.profile-identity-card dl > div { padding: 16px 0; border-bottom: 1px solid var(--rule); }
+.profile-identity-card dt { color: var(--ink-muted); font-size: 11px; margin-bottom: 4px; }
+.profile-identity-card dd { font-size: 12px; margin: 0; }
+.profile-identity-card > .text-link { margin-top: 20px; font-size: 12px; }
+.profile-sections { display: grid; gap: 24px; }
+.profile-reflection-card { padding: 34px; }
+.profile-reflection-card .personal-card-heading { align-items: flex-start; }
+.profile-reflection-card .personal-card-heading > svg { margin-top: 5px; }
+.profile-reflection-card .eyebrow { font-size: 10px; margin-bottom: 9px; }
+.profile-reflection-card h2 { font-size: 29px; }
+.profile-reflection-card > p { font-size: 14px; color: var(--ink-muted); line-height: 1.8; max-width: 530px; }
+.profile-strengths { padding: 0; margin: 12px 0 24px; list-style: none; display: grid; gap: 12px; }
+.profile-strengths li { display: flex; gap: 12px; font-size: 13px; line-height: 1.75; color: var(--ink-muted); }
+.profile-strengths svg { color: var(--you-ink); margin-top: 3px; }
+.profile-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.profile-details-grid .feature-icon { width: 44px; height: 44px; margin-bottom: 24px; }
+.profile-details-grid h2 { font-size: 26px; font-weight: 400; }
+.profile-details-grid p { font-size: 12px; line-height: 1.8; color: var(--ink-muted); }
+.profile-details-grid .profile-plan-status { color: var(--ink); font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.profile-details-grid .text-link { font-size: 12px; }
+
+@media (max-width: 1020px) {
+  .personal-home-grid, .partner-space-grid { grid-template-columns: minmax(0, 1.35fr) minmax(255px, 1fr); gap: 20px; }
+  .personal-space-page .home-action, .partner-preparation-card { padding: 30px; }
+  .profile-workspace { grid-template-columns: 245px minmax(0, 1fr); gap: 22px; }
+  .profile-details-grid { grid-template-columns: 1fr; }
+  .partner-view-label { flex-wrap: wrap; }
+  .readiness-badge { margin-left: 0; }
+}
+@media (max-width: 800px) {
+  .personal-home-grid, .partner-space-grid { grid-template-columns: minmax(0, 1fr); }
+  .personal-pair-card { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+  .personal-pair-card .personal-card-heading, .personal-pair-card > p, .personal-pair-card > .text-link { grid-column: 1 / -1; }
+  .personal-pair-card > p { margin-bottom: 6px; }
+  .partner-space-aside { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .profile-workspace { grid-template-columns: 1fr; }
+  .profile-identity-card { display: grid; grid-template-columns: 90px 1fr; text-align: left; column-gap: 25px; align-items: start; }
+  .profile-avatar { grid-row: 1 / 4; margin-bottom: 0; }
+  .profile-identity-card h2 { margin: 0 0 7px; }
+  .profile-role { justify-self: start; }
+  .profile-identity-card > p { max-width: none; margin: 12px 0 0; }
+  .profile-identity-card dl { grid-column: 1 / -1; margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+  .profile-identity-card > .text-link { grid-column: 1 / -1; }
+  .profile-details-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 540px) {
+  .personal-space-page .space-switch { width: 100%; margin-bottom: 24px; }
+  .space-switch a { flex: 1; padding: 9px 12px; font-size: 12px; }
+  .personal-space-page .home-action { padding: 26px; min-height: 0; }
+  .personal-space-page .home-action-top { margin-bottom: 30px; }
+  .personal-space-page .home-action h2 { font-size: 29px; }
+  .personal-pair-card { display: block; }
+  .personal-space-page .personal-home-links { gap: 18px; margin-top: 20px; }
+  .personal-space-page .dashboard-link { padding: 24px; gap: 16px; }
+  .personal-space-page .dashboard-link strong { font-size: 22px; }
+  .partner-preparation-card { padding: 26px; }
+  .partner-view-label { gap: 12px; margin-bottom: 25px; }
+  .partner-view-label > .person-badge { width: 46px; height: 46px; }
+  .partner-preparation-card > h2 { font-size: 28px; }
+  .readiness-badge { margin-left: 58px; margin-top: -4px; }
+  .pair-readiness { gap: 7px; padding: 25px 0; }
+  .pair-readiness .person-badge { width: 52px; height: 52px; }
+  .pair-readiness-connection { gap: 6px; }
+  .partner-space-aside, .profile-details-grid { grid-template-columns: minmax(0, 1fr); }
+  .partner-privacy-card { padding: 27px; }
+  .profile-reflection-card { padding: 26px; }
+  .profile-reflection-card h2 { font-size: 27px; }
+  .profile-identity-card { padding: 27px; grid-template-columns: 70px 1fr; gap: 0 20px; }
+  .profile-avatar { width: 68px; height: 68px; border-width: 5px; }
+  .profile-identity-card h2 { font-size: 30px; }
+  .profile-identity-card dl { gap: 15px; }
+}
