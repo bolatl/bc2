@@ -11,18 +11,18 @@ import (
 )
 
 type Config struct {
-	Addr, FrontendURL, SessionSecret, StripeSecretKey, LLMAPIKey, LLMProvider, LLMModel, LLMBaseURL string
-	AllowedOrigins                                                                                  []string
-	CookieSecure, EnableRehearsal, DisablePaywall                                                   bool
-	FreeTurns, MaxTurns, DivergenceThreshold                                                        int
+	Addr, FrontendURL, SessionSecret, StripeSecretKey, LLMAPIKey, LLMProvider, LLMModel, LLMBaseURL, DataFile, Funnel string
+	AllowedOrigins                                                                                                    []string
+	CookieSecure, EnableRehearsal, DisablePaywall, EnableCheckpoints                                                  bool
+	FreeTurns, MaxTurns, DivergenceThreshold                                                                          int
 }
 
 func Default() Config {
-	return Config{Addr: ":8080", FrontendURL: "http://localhost:5173", AllowedOrigins: []string{"http://localhost:5173"}, FreeTurns: 4, MaxTurns: 12, DivergenceThreshold: 4}
+	return Config{Addr: ":8080", FrontendURL: "http://localhost:5173", AllowedOrigins: []string{"http://localhost:5173"}, Funnel: "short", FreeTurns: 4, MaxTurns: 12, DivergenceThreshold: 4}
 }
 func Load() (Config, error) {
 	c := Default()
-	for key, dst := range map[string]*string{"ADDR": &c.Addr, "FRONTEND_URL": &c.FrontendURL, "SESSION_SECRET": &c.SessionSecret, "STRIPE_SECRET_KEY": &c.StripeSecretKey, "LLM_API_KEY": &c.LLMAPIKey, "LLM_PROVIDER": &c.LLMProvider, "LLM_MODEL": &c.LLMModel, "LLM_BASE_URL": &c.LLMBaseURL} {
+	for key, dst := range map[string]*string{"ADDR": &c.Addr, "FRONTEND_URL": &c.FrontendURL, "SESSION_SECRET": &c.SessionSecret, "STRIPE_SECRET_KEY": &c.StripeSecretKey, "LLM_API_KEY": &c.LLMAPIKey, "LLM_PROVIDER": &c.LLMProvider, "LLM_MODEL": &c.LLMModel, "LLM_BASE_URL": &c.LLMBaseURL, "DATA_FILE": &c.DataFile, "FUNNEL": &c.Funnel} {
 		if v := os.Getenv(key); v != "" {
 			*dst = v
 		}
@@ -50,7 +50,7 @@ func Load() (Config, error) {
 			return c, fmt.Errorf("ALLOWED_ORIGINS: %w", err)
 		}
 	}
-	for key, dst := range map[string]*bool{"COOKIE_SECURE": &c.CookieSecure, "ENABLE_REHEARSAL": &c.EnableRehearsal, "DISABLE_PAYWALL": &c.DisablePaywall} {
+	for key, dst := range map[string]*bool{"COOKIE_SECURE": &c.CookieSecure, "ENABLE_REHEARSAL": &c.EnableRehearsal, "DISABLE_PAYWALL": &c.DisablePaywall, "ENABLE_CHECKPOINTS": &c.EnableCheckpoints} {
 		if v := os.Getenv(key); v != "" {
 			b, err := strconv.ParseBool(v)
 			if err != nil {
@@ -68,9 +68,17 @@ func Load() (Config, error) {
 			*dst = n
 		}
 	}
-	minTurns := 7
+	c.Funnel = strings.ToLower(strings.TrimSpace(c.Funnel))
+	minTurns := 5
+	switch c.Funnel {
+	case "short":
+	case "full":
+		minTurns = 7
+	default:
+		return c, fmt.Errorf("FUNNEL must be short or full")
+	}
 	if c.EnableRehearsal {
-		minTurns = 8
+		minTurns++
 	}
 	if c.MaxTurns < minTurns || c.MaxTurns > 12 {
 		return c, fmt.Errorf("MAX_TURNS must be %d..12", minTurns)
@@ -80,6 +88,9 @@ func Load() (Config, error) {
 	}
 	if c.DivergenceThreshold < 1 || c.DivergenceThreshold > 9 {
 		return c, fmt.Errorf("DIVERGENCE_THRESHOLD must be 1..9")
+	}
+	if c.DataFile != "" && c.SessionSecret == "" {
+		return c, fmt.Errorf("SESSION_SECRET is required when DATA_FILE is set: cookies must stay valid after a restart")
 	}
 	if c.SessionSecret == "" {
 		var b [32]byte

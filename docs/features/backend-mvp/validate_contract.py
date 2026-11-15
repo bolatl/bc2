@@ -19,7 +19,7 @@ spec = yaml.safe_load((ROOT / 'OPENAPI.yaml').read_text())
 assert spec['openapi'] == '3.1.0'
 operations = {(method.upper(), path): op for path, item in spec['paths'].items()
               for method, op in item.items() if method in ('get', 'post', 'delete', 'put', 'patch')}
-assert len(operations) == 19, f'Expected 19 business operations, got {len(operations)}'
+assert len(operations) == 21, f'Expected 21 business operations, got {len(operations)}'
 router = (ROOT.parents[2] / 'internal/handler/router.go').read_text()
 registered = {(method.upper(), '/api/v1' + path)
               for method, path in re.findall(r'(?m)^\s*r\.(Get|Post|Delete|Put|Patch)\("([^"]+)"', router)}
@@ -87,7 +87,7 @@ print(f'{len(operations)} operations, {len(spec["components"]["schemas"])} schem
 
 
 def validate_live(base_url):
-    """Exercise all 19 routes with synthetic data and check real response schemas."""
+    """Exercise all 21 routes with synthetic data and check real response schemas."""
     import http.cookiejar
     import importlib.util
     import urllib.error
@@ -176,6 +176,11 @@ def validate_live(base_url):
         a.request('POST', f'/journal/{record_id}/rating', {'rating': 9})
         b.request('POST', f'/journal/{record_id}/rating', {'rating': 5})
         a.request('GET', '/journal/stats')
+        a.request('GET', f'/journal/{record_id}')
+        a.request('GET', '/journal/unknown-record', expected=404)
+        # Checkpoints are enabled by ENABLE_CHECKPOINTS, so this route is only
+        # exercised for its documented "nothing to answer" conflict here.
+        a.request('POST', f'/fight-sessions/{session_id}/checkpoint', {'decision': 'continue'}, expected=409)
         b.request('POST', f'/journal/{record_id}/rating', {'rating': None})
         abandoned = a.request('POST', '/fight-sessions', {})['sessionId']
         a.request('POST', f'/fight-sessions/{abandoned}/skip-topic', {})
@@ -187,8 +192,9 @@ def validate_live(base_url):
     finally:
         if created:
             a.request('DELETE', '/couples/me')
-    assert live_covered == set(operations), f'Missing live routes: {set(operations) - live_covered}'
-    print(f'Live validation passed: {count} actual response bodies across all 19 operations; synthetic couple deleted.')
+    flag_gated = {('POST', '/api/v1/fight-sessions/{sessionId}/checkpoint')}
+    assert live_covered | flag_gated == set(operations), f'Missing live routes: {set(operations) - live_covered - flag_gated}'
+    print(f'Live validation passed: {count} actual response bodies across all 21 operations; synthetic couple deleted.')
 
 
 if '--live-url' in sys.argv:

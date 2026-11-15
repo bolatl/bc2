@@ -62,12 +62,20 @@ type FightResult struct {
 	FeltText, NeedText, OpeningLine string
 	SharedRules                     []string
 }
+
+// FightCheckpoint is an interim summary offered mid-session. The partner may
+// stop here or continue; it is private to the session owner.
+type FightCheckpoint struct {
+	AfterStage                      string
+	FeltText, NeedText, OpeningLine string
+}
 type FightSession struct {
 	ID, CoupleID, PartnerRole, RoundID string
 	Status, Tier, Stage, NeutralTopic  string
 	Turns                              []FightTurn
 	Current                            *FightTurn
 	Result                             *FightResult
+	Checkpoint                         *FightCheckpoint
 	ThermometerStart, ThermometerEnd   *int
 	CreatedAt                          time.Time
 	CompletedAt                        *time.Time

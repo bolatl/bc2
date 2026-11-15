@@ -8,6 +8,8 @@ import { Button, Loading, Notice, Page, Scale } from '../components/ui';
 import { config } from '../config';
 import '../styles/conversation.css';
 
+// Keep in sync with MaxAnswerChars in internal/service/fight.go.
+const maxAnswerChars = 300;
 const stageTitles: Record<string, string> = {
   thermometer_start: 'Before we begin', facts: 'What happened', feelings: 'Name the feeling',
   needs: 'What you need', partner_view: 'Another perspective', rehearsal: 'Try the words',
@@ -213,11 +215,11 @@ export function FightPage() {
           <button className="option answer-card" disabled={locked} onClick={() => answer('card_left')}><span className="answer-card-icon" aria-hidden="true">{question.stage === 'ready' ? <MessageCircle size={23} /> : <span>A</span>}</span><span>{question.optionLeft}</span><ArrowRight size={18} aria-hidden="true" /></button>
           <button className="option answer-card" disabled={locked} onClick={() => answer('card_right')}><span className="answer-card-icon" aria-hidden="true">{question.stage === 'ready' ? <MessageSquareText size={23} /> : <span>B</span>}</span><span>{question.optionRight}</span><ArrowRight size={18} aria-hidden="true" /></button>
         </div>
-        {question.stage !== 'ready' && <form className="free-answer" onSubmit={e => { e.preventDefault(); if (draft.trim() && count <= 4000) answer('free_text', draft); }}>
+        {question.stage !== 'ready' && <form className="free-answer" onSubmit={e => { e.preventDefault(); if (draft.trim() && count <= maxAnswerChars) answer('free_text', draft); }}>
           <label htmlFor="own-answer">Or put it in your own words</label>
-          <textarea id="own-answer" value={draft} disabled={locked} rows={3} placeholder="What feels true for you?" aria-describedby="answer-count" onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (draft.trim() && count <= 4000) answer('free_text', draft); } }} />
-          <div className="answer-footer"><span id="answer-count">{count} / 4,000<span className="keyboard-hint">Shift + Enter for a new line</span></span><Button disabled={!draft.trim() || count > 4000 || locked} type="submit">Continue <ArrowRight size={18} aria-hidden="true" /></Button></div>
-          {count > 4000 && <p role="alert">Please keep your answer within 4,000 characters.</p>}
+          <textarea id="own-answer" value={draft} disabled={locked} rows={3} placeholder="What feels true for you?" aria-describedby="answer-count" onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (draft.trim() && count <= maxAnswerChars) answer('free_text', draft); } }} />
+          <div className="answer-footer"><span id="answer-count">{count} / {maxAnswerChars}<span className="keyboard-hint">Shift + Enter for a new line</span></span><Button disabled={!draft.trim() || count > maxAnswerChars || locked} type="submit">Continue <ArrowRight size={18} aria-hidden="true" /></Button></div>
+          {count > maxAnswerChars && <p role="alert">Please keep your answer within {maxAnswerChars} characters.</p>}
         </form>}
       </>}
     <div aria-live="polite" className="request-status">{operation.busy && <><ConversationPulse /><span>{operation.slow ? 'This is taking longer than usual.' : question.stage === 'ready' ? 'Preparing your summary…' : 'Preparing the next step…'}</span></>}</div>

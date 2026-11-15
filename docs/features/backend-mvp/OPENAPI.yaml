@@ -601,6 +601,84 @@ paths:
         in: path
         required: true
         schema: *id001
+  /api/v1/fight-sessions/{sessionId}/checkpoint:
+    post:
+      operationId: answerCheckpoint
+      summary: Stop at an interim summary or continue the session
+      tags:
+      - fight-sessions
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnResponse'
+        '400':
+          description: Invalid or malformed JSON request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: State conflict, stale turn, occupied role, or incomplete payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Next session step or result could not be generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request exceeds body size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Expected application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckpointRequest'
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: *id001
   /api/v1/fight-sessions/{sessionId}/skip-topic:
     post:
       operationId: skipTopic
@@ -1038,6 +1116,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/journal/{fightRecordId}:
+    get:
+      operationId: getJournalEntry
+      summary: Read one past conversation with the caller's own private result
+      tags:
+      - journal
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalEntryResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Active payment is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resource missing, private to another actor, or invitation unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Actor or request origin is not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: fightRecordId
+        in: path
+        required: true
+        schema: *id001
 components:
   securitySchemes:
     anonymousSession:
@@ -1419,7 +1545,7 @@ components:
           type: string
           description: Required for free_text. For cards use the exact displayed card text or omit it; server resolves the
             stored card.
-          maxLength: 4000
+          maxLength: 300
       allOf:
       - if:
           properties:
@@ -1563,12 +1689,71 @@ components:
         resultUrl:
           type: string
           description: API path to the private session result.
+    CheckpointRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - decision
+      properties:
+        decision:
+          type: string
+          enum:
+          - stop
+          - continue
+          description: stop skips the remaining content stages and goes to the closing thermometer; continue resumes the normal order.
+    CheckpointSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - feltText
+      - needText
+      - openingLine
+      properties:
+        feltText:
+          type: string
+        needText:
+          type: string
+        openingLine:
+          type: string
+    CheckpointResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - afterStage
+      - summary
+      - question
+      - decisions
+      properties:
+        type:
+          type: string
+          const: checkpoint
+        afterStage:
+          type: string
+          enum:
+          - feelings
+          - needs
+          - partner_view
+        summary:
+          $ref: '#/components/schemas/CheckpointSummary'
+        question:
+          type: string
+        decisions:
+          type: array
+          items:
+            type: string
+            enum:
+            - stop
+            - continue
+          minItems: 2
+          maxItems: 2
     TurnResponse:
       oneOf:
       - $ref: '#/components/schemas/NextTurnResponse'
       - $ref: '#/components/schemas/PaywallResponse'
       - $ref: '#/components/schemas/SafetyStopResponse'
       - $ref: '#/components/schemas/CompletedResponse'
+      - $ref: '#/components/schemas/CheckpointResponse'
       discriminator:
         propertyName: type
         mapping:
@@ -1576,6 +1761,7 @@ components:
           paywall_required: '#/components/schemas/PaywallResponse'
           safety_stop: '#/components/schemas/SafetyStopResponse'
           completed: '#/components/schemas/CompletedResponse'
+          checkpoint: '#/components/schemas/CheckpointResponse'
     FightTurn:
       type: object
       additionalProperties: false
@@ -1857,6 +2043,65 @@ components:
         divergenceFlag:
           type: boolean
           description: True only with two numeric ratings whose difference reaches the configured threshold (default 4).
+    JournalEntryResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - topic
+      - startedAt
+      - bothReadyAt
+      - ratingA
+      - ratingB
+      - averageRating
+      - color
+      - status
+      - divergenceFlag
+      - myResult
+      properties:
+        id: *id001
+        topic:
+          $ref: '#/components/schemas/FightTopic'
+        startedAt: *id002
+        bothReadyAt:
+          type:
+          - string
+          - 'null'
+          description: RFC 3339 timestamp in UTC.
+          format: date-time
+        ratingA:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+        ratingB:
+          type:
+          - integer
+          - 'null'
+          description: Integer scale from 1 through 10.
+          minimum: 1
+          maximum: 10
+        averageRating:
+          type:
+          - number
+          - 'null'
+          description: Mean of both numeric ratings; absent average is null.
+          minimum: 1
+          maximum: 10
+        color:
+          $ref: '#/components/schemas/RatingColor'
+        status:
+          $ref: '#/components/schemas/RecordStatus'
+        divergenceFlag:
+          type: boolean
+          description: True only with two numeric ratings whose difference reaches the configured threshold (default 4).
+        myResult:
+          description: The caller's own private result for this round, or null if unavailable. The partner's result is never included.
+          anyOf:
+          - $ref: '#/components/schemas/FightSessionResultResponse'
+          - type: 'null'
     JournalResponse:
       type: array
       items:

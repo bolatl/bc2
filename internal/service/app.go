@@ -105,6 +105,7 @@ func cloneCouple(c model.Couple) model.Couple {
 func cloneFight(f model.FightSession) model.FightSession {
 	f.Turns = append([]model.FightTurn{}, f.Turns...)
 	f.Current = cp(f.Current)
+	f.Checkpoint = cp(f.Checkpoint)
 	f.Result = cp(f.Result)
 	if f.Result != nil {
 		f.Result.SharedRules = append([]string{}, f.Result.SharedRules...)

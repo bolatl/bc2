@@ -15,6 +15,9 @@ node_modules/
 __pycache__/
 *.py[cod]
 
+# Local data file with couples, journal and private results
+/data/
+
 # Build and test output
 /bin/
 /coverage/
@@ -57,7 +60,6 @@ Desktop.ini
 /LoveLab_PRODUCT_BRIEF.md
 /SKILL.md
 /Business_Cup_2.0_Brief.pdf
-/LoveLab_prototype.html
 /backend_changes_v*.md
 /frontend.md
 /test.md

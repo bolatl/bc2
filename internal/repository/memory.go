@@ -5,9 +5,10 @@ package repository
 import "sync"
 
 type Memory[T any] struct {
-	mu    sync.RWMutex
-	data  map[string]T
-	clone func(T) T
+	mu       sync.RWMutex
+	data     map[string]T
+	clone    func(T) T
+	onChange func()
 }
 
 func New[T any](clone func(T) T) *Memory[T] {
@@ -22,8 +23,28 @@ func (r *Memory[T]) Get(id string) (T, bool) {
 	}
 	return v, ok
 }
-func (r *Memory[T]) Put(id string, v T) { r.mu.Lock(); defer r.mu.Unlock(); r.data[id] = r.clone(v) }
-func (r *Memory[T]) Delete(id string)   { r.mu.Lock(); defer r.mu.Unlock(); delete(r.data, id) }
+
+// OnChange registers a callback run after every Put or Delete, outside the lock.
+// It must not block; it exists so a background writer can persist the store.
+func (r *Memory[T]) OnChange(fn func()) { r.mu.Lock(); r.onChange = fn; r.mu.Unlock() }
+func (r *Memory[T]) Put(id string, v T) {
+	r.mu.Lock()
+	r.data[id] = r.clone(v)
+	fn := r.onChange
+	r.mu.Unlock()
+	if fn != nil {
+		fn()
+	}
+}
+func (r *Memory[T]) Delete(id string) {
+	r.mu.Lock()
+	delete(r.data, id)
+	fn := r.onChange
+	r.mu.Unlock()
+	if fn != nil {
+		fn()
+	}
+}
 func (r *Memory[T]) All() []T {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

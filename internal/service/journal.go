@@ -39,6 +39,36 @@ func (a *App) JournalList(actor model.Actor) ([]model.FightRecord, error) {
 	}
 	return a.journalRecords(actor.CoupleID), nil
 }
+
+// JournalGet returns one record together with the caller's own private result
+// for that round. The partner's result is never included.
+func (a *App) JournalGet(actor model.Actor, id string) (dto.JournalEntryResponse, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.paidCouple(actor); err != nil {
+		return dto.JournalEntryResponse{}, err
+	}
+	r, ok := a.Journal.Get(id)
+	if !ok || r.CoupleID != actor.CoupleID {
+		return dto.JournalEntryResponse{}, notFound()
+	}
+	out := dto.JournalEntryResponse{FightRecord: r}
+	c, err := a.couple(actor)
+	if err != nil {
+		return out, err
+	}
+	for _, f := range a.Fights.All() {
+		if f.CoupleID == actor.CoupleID && f.RoundID == id && f.PartnerRole == actor.PartnerRole && f.Status == "completed" && f.Result != nil {
+			res, e := a.resultView(actor, c, f)
+			if e != nil {
+				return out, e
+			}
+			out.MyResult = &res
+			break
+		}
+	}
+	return out, nil
+}
 func (a *App) Rate(actor model.Actor, id string, rating *int) (model.FightRecord, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
