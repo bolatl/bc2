@@ -5,7 +5,7 @@ import { useSession } from './session';
 import { BrandMark, Button, Loading, Notice, Page } from '../components/ui';
 import { WelcomePage, OnboardingPage, ChoosePage, PersonalityPage, PersonalityResultPage, InvitePage } from '../features/Onboarding';
 import { FightPage, ResultPage, PaywallPage, CheckoutSuccessPage, CheckoutCancelPage } from '../features/Conversation';
-import { HomePage, JournalPage, RatingPage, StatsPage, SettingsPage } from '../features/Journal';
+import { HomePage, JournalPage, JournalEntryPage, RatingPage, StatsPage, SettingsPage } from '../features/Journal';
 import { config } from '../config';
 
 function Protected({ children }: { children: ReactNode }) {
@@ -39,6 +39,7 @@ export function App() {
       <Route path="/checkout/success" element={<Protected><CheckoutSuccessPage /></Protected>} />
       <Route path="/checkout/cancel" element={<Protected><CheckoutCancelPage /></Protected>} />
       <Route path="/journal" element={<Protected><JournalPage /></Protected>} />
+      <Route path="/journal/:recordId" element={<Protected><JournalEntryPage /></Protected>} />
       <Route path="/journal/:recordId/rating" element={<Protected><RatingPage /></Protected>} />
       <Route path="/stats" element={<Protected><StatsPage /></Protected>} />
       <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />

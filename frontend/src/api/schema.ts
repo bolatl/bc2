@@ -548,7 +548,7 @@ export interface components {
         };
         CheckpointRequest: {
             /**
-             * @description stop skips the remaining content stages and goes to the closing thermometer; continue resumes the normal order.
+             * @description stop skips the remaining content stages and goes to ready in short flow or the closing thermometer then ready in full flow; continue resumes the normal order.
              * @enum {string}
              */
             decision: "stop" | "continue";

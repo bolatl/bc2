@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ArrowUpRight, BookOpen, Check, CircleHelp, HeartHandshake, LockKeyhole, MessageCircle, MessageCircleHeart, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingUp, UserRound } from 'lucide-react';
 import { api, ApiError, errorMessage } from '../api/client';
-import type { Fight, FightRecord, Journal, Stats } from '../api/types';
+import type { Fight, FightRecord, Journal, JournalEntry, Stats } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page, Scale } from '../components/ui';
 import '../styles/journal.css';
@@ -56,7 +56,7 @@ export function HomePage() {
             <div className="home-action-top"><span className="feature-icon"><MessageCircleHeart size={28} aria-hidden="true" /></span><span className="privacy-pill"><LockKeyhole size={13} />Just for you</span></div>
             <p className="eyebrow">Your private preparation</p>
             <h2>{active ? 'Your conversation is waiting' : completed ? 'Your words are ready' : 'Start with your side'}</h2>
-            <p>{active ? 'Your thoughts are saved. Come back to the same step and take it at your own pace.' : completed ? 'Keep your first sentence close. Revisit your guide before you talk to each other.' : 'What happened, what hurt, and what you need. We’ll help you turn it into words you can share.'}</p>
+            <p>{active ? 'Return to the same step while your preparation is active, and take it at your own pace.' : completed ? 'Keep your first sentence close. Revisit your guide before you talk to each other.' : 'What happened, what hurt, and what you need. We’ll help you turn it into words you can share.'}</p>
             <div className="actions">{active || completed ? <Link className="button button-primary" to={`/fight-sessions/${couple?.currentSessionId}${completed ? '/result' : ''}`}>{completed ? 'View your guide' : 'Continue conversation'}<ArrowRight size={18} /></Link> : <Button disabled={busy} onClick={() => void start()}>{busy ? 'Getting ready…' : 'Start a conversation'}<ArrowRight size={18} /></Button>}
               {completed && !waiting && <Button disabled={busy} variant="text" onClick={() => void start()}>Start another conversation</Button>}
             </div>
@@ -106,7 +106,53 @@ function RatingLegend() {
 }
 function JournalRow({ record }: { record: FightRecord }) {
   const status = record.status === 'not_discussed' ? 'Not talked yet' : record.status === 'pending' ? 'Waiting for both check-ins' : 'Both checked in';
-  return <article className="journal-row"><span className={`journal-topic-icon rating-${record.color}`}><MessageCircle size={20} /></span><div className="journal-row-copy"><p className="quiet">{date(record.startedAt)}</p><h2>{topicName(record.topic)}</h2><p className="record-status"><span className={`status-dot ${record.color}`} />{status}</p>{record.divergenceFlag && <p className="divergence-note">You see this one differently — worth a short check-in.</p>}</div><div className="journal-rating">{record.averageRating !== null ? <span className={`rating-value rating-${record.color}`}><strong>{record.averageRating}</strong><small> / 10 together</small></span> : <span className="quiet">No shared rating yet</span>}<Link className="text-link" to={`/journal/${record.id}/rating`}>Check in<ArrowUpRight size={17} /></Link></div></article>;
+  return <article className="journal-row"><span className={`journal-topic-icon rating-${record.color}`}><MessageCircle size={20} /></span><div className="journal-row-copy"><p className="quiet">{date(record.startedAt)}</p><h2>{topicName(record.topic)}</h2><Link className="text-link journal-summary-link" to={`/journal/${record.id}`}>View your summary<ArrowUpRight size={16} /></Link><p className="record-status"><span className={`status-dot ${record.color}`} />{status}</p>{record.divergenceFlag && <p className="divergence-note">You see this one differently — worth a short check-in.</p>}</div><div className="journal-rating">{record.averageRating !== null ? <span className={`rating-value rating-${record.color}`}><strong>{record.averageRating}</strong><small> / 10 together</small></span> : <span className="quiet">No shared rating yet</span>}<Link className="text-link" to={`/journal/${record.id}/rating`}>Check in<ArrowUpRight size={17} /></Link></div></article>;
+}
+
+export function JournalEntryPage() {
+  const { recordId = '' } = useParams();
+  const { couple } = useSession();
+  const query = useQuery({
+    queryKey: ['journal-entry', couple?.coupleId, couple?.partnerRole, recordId],
+    queryFn: ({ signal }) => api<JournalEntry>(`/journal/${encodeURIComponent(recordId)}`, undefined, { signal }),
+    enabled: Boolean(couple && recordId),
+  });
+  const entry = query.data;
+  const result = entry?.myResult;
+  return <Page className={`result-page journal-entry-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} layout="wide" eyebrow="From your journal" title="Your conversation, revisited.">
+    <Link className="text-link journal-back" to="/journal">Back to journal<ArrowUpRight size={16} /></Link>
+    {query.isPending ? <Loading label="Opening your past conversation…" /> : query.error ? (
+      query.error instanceof ApiError && query.error.status === 404
+        ? <Notice>This conversation is unavailable.</Notice>
+        : <AccessNotice error={query.error} retry={() => void query.refetch()} />
+    ) : entry && <div className="result-workspace">
+      <section className="result-main journal-entry-summary" aria-labelledby="personal-summary-heading">
+        <h2 id="personal-summary-heading">Your personal summary</h2>
+        {result ? <>
+          <section className="opening-card">
+            <div className="opening-card-top"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Only you see this</span><span className="topic-pill">{topicName(entry.topic)}</span></div>
+            <p className="eyebrow">Your opening words</p>
+            {result.locked.includes('openingLine') ? <p>Your opening words are unavailable.</p> : <blockquote className="summary-line">“{result.openingLine}”</blockquote>}
+            <span className="opening-card-note"><MessageCircle size={16} aria-hidden="true" />A starting point. Make it sound like you.</span>
+          </section>
+          <div className="result-reflections"><section><HeartHandshake size={22} aria-hidden="true" /><h3>What you felt</h3><p>{result.feltText}</p></section><section><Sparkles size={22} aria-hidden="true" /><h3>What you needed</h3><p>{result.needText}</p></section></div>
+          {result.sharedRules.length > 0 && <section className="result-rules"><div className="result-section-title"><HeartHandshake size={22} aria-hidden="true" /><h3>Make space for each other.</h3></div>{result.sharedRules.map((rule, index) => <div className="result-rule" key={`${index}-${rule}`}><span>{index + 1}</span><p>{rule}</p></div>)}</section>}
+        </> : <Notice>Your personal summary is unavailable for this conversation. You can still view the shared details and add a check-in.</Notice>}
+      </section>
+      <aside className="result-sidebar">
+        <section className="dashboard-card journal-entry-details">
+          <p className="eyebrow">Shared details</p><h2>{topicName(entry.topic)}</h2>
+          <dl><div><dt>Started</dt><dd>{date(entry.startedAt)}</dd></div><div><dt>Both ready</dt><dd>{entry.bothReadyAt ? date(entry.bothReadyAt) : 'Not yet'}</dd></div><div><dt>Your check-in</dt><dd>{(couple?.partnerRole === 'A' ? entry.ratingA : entry.ratingB) ?? 'Not rated'}</dd></div><div><dt>Partner’s check-in</dt><dd>{(couple?.partnerRole === 'A' ? entry.ratingB : entry.ratingA) ?? 'Not rated'}</dd></div><div><dt>Shared rating</dt><dd>{entry.averageRating === null ? 'Not rated' : `${entry.averageRating} / 10`}</dd></div></dl>
+          {entry.divergenceFlag && <p className="journal-entry-divergence">Your ratings differ. It may help to check in about how each of you felt.</p>}
+          <Link className="button button-primary" to={`/journal/${entry.id}/rating`}>Check in<ArrowRight size={18} /></Link>
+        </section>
+        {result && result.thermometerStart !== null && <section className="thermometer-result"><h2>Your intensity check-in</h2>{result.thermometerEnd !== null
+          ? <><div className="thermometer-comparison"><div><strong>{result.thermometerStart}</strong><span>Before</span></div><ArrowRight size={24} aria-hidden="true" /><div><strong>{result.thermometerEnd}</strong><span>After</span></div></div><p>Before and after preparing, on a scale of 1–10.</p></>
+          : <><div className="thermometer-initial"><strong>{result.thermometerStart}<span>/ 10</span></strong><span>Starting intensity</span></div><p>No closing intensity was recorded.</p></>}</section>}
+        <p className="result-privacy"><ShieldCheck size={17} aria-hidden="true" /><span>Your partner sees their own summary when they open this conversation. Your private answers are not included.</span></p>
+      </aside>
+    </div>}
+  </Page>;
 }
 
 export function RatingPage() {
@@ -128,6 +174,7 @@ export function RatingPage() {
       await api(`/journal/${record.id}/rating`, { rating: value }, { signal: controller.signal });
       await cache.invalidateQueries({ queryKey: ['journal'] });
       await cache.invalidateQueries({ queryKey: ['stats'] });
+      await cache.invalidateQueries({ queryKey: ['journal-entry'] });
       if (!controller.signal.aborted) navigate('/journal');
     } catch (reason) { if (!controller.signal.aborted) setError(errorMessage(reason)); }
     finally { request.current = null; if (!controller.signal.aborted) setBusy(false); }
@@ -178,8 +225,8 @@ export function SettingsPage() {
   }
   return <Page className="settings-page" layout="wide" eyebrow="Your settings" title="Your space. Your data." description="A private place to prepare, with you in control of what stays.">
     <div className="settings-grid">
-      <section className="settings-section dashboard-card"><span className="feature-icon feature-icon-partner"><ShieldCheck size={26} /></span><h2>About this session</h2><span className="session-role"><span className="person-badge person-you"><UserRound size={17} /></span>Partner {couple?.partnerRole}</span><p>You’re using the browser for partner {couple?.partnerRole}. Keep this browser to return to your own preparation. Your partner needs a separate browser profile.</p><p className="quiet">This initial version stores data in server memory. Restarting the backend clears your session and journal.</p></section>
-      <section className="settings-section dashboard-card"><span className="feature-icon feature-icon-soft"><LockKeyhole size={26} /></span><h2>Private by design</h2><p>Your private answers belong to your preparation. Your shared journal holds only the topic, dates, and check-ins.</p><div className="settings-privacy-note"><HeartHandshake size={22} /><p>You can understand each other without sharing every word you write here.</p></div></section>
+      <section className="settings-section dashboard-card"><span className="feature-icon feature-icon-partner"><ShieldCheck size={26} /></span><h2>About this session</h2><span className="session-role"><span className="person-badge person-you"><UserRound size={17} /></span>Partner {couple?.partnerRole}</span><p>You’re using the browser for partner {couple?.partnerRole}. Keep this browser to return to your own preparation. Your partner needs a separate browser profile.</p><p className="quiet">When history storage is enabled, completed summaries and journal entries remain available after a server restart. Unfinished preparations are not saved across restarts. Keep your browser cookies to retain access.</p></section>
+      <section className="settings-section dashboard-card"><span className="feature-icon feature-icon-soft"><LockKeyhole size={26} /></span><h2>Private by design</h2><p>Your private answers belong to your preparation. The journal shares the topic, dates, and check-ins. When you open a past conversation, only your own personal summary is shown to you.</p><div className="settings-privacy-note"><HeartHandshake size={22} /><p>You can understand each other without sharing every word you write here.</p></div></section>
       <section className="settings-section settings-delete dashboard-card"><div><h2>Delete your couple’s data</h2><p>This removes both partners’ profiles, preparations, and journal entries from Love Lab. You won’t be able to undo it.</p><p className="quiet">This does not cancel a Stripe subscription or delete records held by an external provider.</p></div><Button variant="secondary" className="danger-button" onClick={() => dialog.current?.showModal()}><Trash2 size={17} />Delete everything</Button></section>
     </div>
     <dialog ref={dialog} className="confirm-dialog" onCancel={event => { if (busy) event.preventDefault(); }}><span className="feature-icon"><Trash2 size={24} /></span><h2>Delete everything for both of you?</h2><p>Both partners’ Love Lab data will be removed. This cannot be undone.</p>{error && <Notice kind="error">{error}</Notice>}<div className="actions"><Button className="danger-button" disabled={busy} onClick={() => void remove()}>{busy ? 'Deleting…' : 'Yes, delete everything'}</Button><Button disabled={busy} variant="text" onClick={() => dialog.current?.close()}>Cancel</Button></div></dialog>

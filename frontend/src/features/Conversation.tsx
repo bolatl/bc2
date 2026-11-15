@@ -17,12 +17,24 @@ const stageTitles: Record<string, string> = {
 };
 const topicLabel = (value: string) => value.replaceAll('_', ' ').replace(/^./, c => c.toUpperCase());
 
-function PreparationAside({ stage }: { stage: string }) {
-  const active = ['thermometer_end', 'ready'].includes(stage) ? 2 : ['partner_view', 'rehearsal'].includes(stage) ? 1 : 0;
+function PreparationAside({ stage, turns }: { stage: string; turns: Fight['turns'] }) {
+  const perspectiveStages = ['partner_view', 'rehearsal'];
+  const hasPerspective = perspectiveStages.includes(stage) || turns.some(turn => perspectiveStages.includes(turn.stage));
+  const labels = ['Understand your side', ...(hasPerspective ? ['Find a little perspective'] : []), 'Get ready to talk'];
+  const active = ['thermometer_end', 'ready'].includes(stage) ? labels.length - 1 : perspectiveStages.includes(stage) ? 1 : 0;
   return <div className="preparation-guide">
-    <ol className="preparation-steps">{['Understand your side', 'Find a little perspective', 'Get ready to talk'].map((label, index) => <li key={label} className={index === active ? 'current' : index < active ? 'complete' : ''} aria-current={index === active ? 'step' : undefined}><span aria-hidden="true">{index < active ? <Check size={15} /> : index + 1}</span>{label}</li>)}</ol>
+    <ol className="preparation-steps">{labels.map((label, index) => <li key={label} className={index === active ? 'current' : index < active ? 'complete' : ''} aria-current={index === active ? 'step' : undefined}><span aria-hidden="true">{index < active ? <Check size={15} /> : index + 1}</span>{label}</li>)}</ol>
     <div className="private-space-note"><ShieldCheck size={21} aria-hidden="true" /><h2>A little space, just for you.</h2><p>Your partner won’t see your answers. Take a moment to figure out what you want to say.</p></div>
   </div>;
+}
+
+// A failed request may still have been saved. Only clear its error and draft
+// when reconciliation confirms that the server moved to a different step.
+function fightStep(fight: Fight) {
+  const turn = fight.currentTurn;
+  const step = turn?.type === 'next_turn' ? `${turn.stage}:${turn.turnIndex}`
+    : turn?.type === 'checkpoint' ? turn.afterStage : '';
+  return `${fight.status}:${turn?.type}:${step}`;
 }
 
 function ConversationPulse() {
@@ -133,12 +145,12 @@ export function FightPage() {
   async function reconcile() {
     if (operation.inFlight.current) return;
     operation.inFlight.current = true; operation.setBusy(true);
-    const before = question?.turnIndex;
+    const before = fight ? fightStep(fight) : null;
     const fresh = await load(true);
     if (alive.current) {
       if (fresh) {
         setNeedsCheck(false);
-        if (fresh.currentTurn?.type !== 'next_turn' || fresh.currentTurn.turnIndex !== before) {
+        if (fightStep(fresh) !== before) {
           setDraft(''); setScore(null); setMessage(null);
         }
       }
@@ -147,10 +159,10 @@ export function FightPage() {
     operation.inFlight.current = false;
   }
 
-  async function mutate(action: 'turns' | 'back' | 'skip-topic', body: unknown) {
+  async function mutate(action: 'turns' | 'back' | 'skip-topic' | 'checkpoint', body: unknown) {
     if (operation.inFlight.current || !fight || locked) return;
     operation.inFlight.current = true; operation.setBusy(true); setMessage(null); setConfirm(null);
-    const previousIndex = question?.turnIndex;
+    const previousStep = fightStep(fight);
     try {
       const response = await api<TurnResponse | Fight>(`/fight-sessions/${encodeURIComponent(id)}/${action}`, body, { signal: operation.controller.current.signal });
       if (!alive.current) return;
@@ -176,7 +188,7 @@ export function FightPage() {
       const fresh = await load(true);
       if (alive.current && fresh) {
         setNeedsCheck(false);
-        if (fresh.currentTurn?.type !== 'next_turn' || fresh.currentTurn.turnIndex !== previousIndex) {
+        if (fightStep(fresh) !== previousStep) {
           setDraft(''); setScore(null); setMessage(null);
         }
       }
@@ -199,16 +211,39 @@ export function FightPage() {
     <p className="privacy-note processing-note"><LockKeyhole size={16} aria-hidden="true" /><span>Your partner has not been notified about this stop.</span></p><Link className="text-link" to="/home">Return home <ArrowRight size={16} aria-hidden="true" /></Link>
   </Page>;
   if (fight.status === 'skipped') return <Page eyebrow="Conversation closed" title="We can leave this here."><p className="lead">Your answers for this topic have been cleared.</p><Link className="button button-primary" to="/home">Return home <ArrowRight size={18} /></Link></Page>;
+  const feedback = <>
+    {(message || resource.error) && <Notice kind="error">{message || resource.error}</Notice>}
+    {needsCheck && <div className="stack"><p>Check the saved conversation before answering again.</p><Button variant="secondary" disabled={operation.busy} onClick={() => void reconcile()}><RefreshCw size={16} /> Check again</Button></div>}
+  </>;
+  const navigation = <>
+    <div aria-live="polite" className="request-status">{operation.busy && <><ConversationPulse /><span>{operation.slow ? 'This is taking longer than usual.' : question?.stage === 'ready' ? 'Preparing your summary…' : 'Preparing the next step…'}</span></>}</div>
+    {confirm && <Notice><p>{confirm === 'back' ? 'Going back clears your previous answer and anything after it.' : 'Skipping this topic clears your private answers for this conversation.'}</p><div className="actions"><Button disabled={locked} onClick={() => void mutate(confirm === 'back' ? 'back' : 'skip-topic', confirm === 'back' ? { turnIndex: fight.turns[fight.turns.length - 1].turnIndex } : {})}>{confirm === 'back' ? 'Go back' : 'Skip this topic'}</Button><Button variant="text" onClick={() => setConfirm(null)}>Cancel</Button></div></Notice>}
+    <div className="conversation-navigation"><Button variant="text" disabled={locked || !fight.turns.length} onClick={() => setConfirm('back')}><ArrowLeft size={16} aria-hidden="true" />Back</Button><Button variant="text" disabled={locked} onClick={() => setConfirm('skip')}>Skip this topic</Button></div>
+    {fight.turns.length > 0 && <details className="history"><summary>Your earlier answers<ChevronDown size={17} aria-hidden="true" /></summary>{fight.turns.map(turn => <div className="history-row" key={turn.turnIndex}><p className="eyebrow">{stageTitles[turn.stage]}</p><p>{turn.agentQuestion}</p><p className="your-answer">{turn.answerText}</p></div>)}</details>}
+  </>;
+  if (current?.type === 'checkpoint') return <Page number={<MessageSquareText size={42} aria-hidden="true" />} eyebrow="A moment to check in" title={current.question} className={`conversation-page checkpoint-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={current.afterStage} turns={fight.turns} />}>
+    <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Your private preparation</span><span>{fight.turns.length} answers saved</span></div>
+    {feedback}
+    <section className="checkpoint-summary" aria-label="Your private checkpoint summary">
+      <div className="checkpoint-reflections"><div><HeartHandshake size={21} aria-hidden="true" /><h2>What you felt</h2><p>{current.summary.feltText}</p></div><div><Sparkles size={21} aria-hidden="true" /><h2>What you needed</h2><p>{current.summary.needText}</p></div></div>
+      <div className="checkpoint-opening"><h2>A way to begin</h2><blockquote>“{current.summary.openingLine}”</blockquote></div>
+    </section>
+    <p className="checkpoint-guidance">This is your summary so far. Wrapping up takes you to the final steps, where you can choose whether you’re ready to talk.</p>
+    <div className="actions checkpoint-actions">
+      {current.decisions.includes('continue') && <Button disabled={locked} onClick={() => void mutate('checkpoint', { decision: 'continue' })}>Continue <ArrowRight size={18} aria-hidden="true" /></Button>}
+      {current.decisions.includes('stop') && <Button variant="secondary" disabled={locked} onClick={() => void mutate('checkpoint', { decision: 'stop' })}>Wrap up</Button>}
+    </div>
+    {navigation}
+  </Page>;
   if (!question) return <Loading label="Opening the next step…" />;
 
   const thermometer = question.stage === 'thermometer_start' || question.stage === 'thermometer_end';
   const number = question.progressStageIndex === null ? question.stage === 'thermometer_start' ? 'Before' : 'After' : String(question.progressStageIndex).padStart(2, '0');
   const count = [...draft].length;
-  return <Page number={number} eyebrow={stageTitles[question.stage]} title={question.agentQuestion} className={`conversation-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} />}>
+  return <Page number={number} eyebrow={stageTitles[question.stage]} title={question.agentQuestion} className={`conversation-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} turns={fight.turns} />}>
     <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Your private preparation</span><span>{question.turnsUsed} / {question.turnsMax} answers</span></div>
     {question.stage === 'thermometer_start' && <ProcessingNote />}
-    {(message || resource.error) && <Notice>{message || resource.error}</Notice>}
-    {needsCheck && <div className="stack"><p>Check the saved conversation before answering again.</p><Button variant="secondary" disabled={operation.busy} onClick={() => void reconcile()}><RefreshCw size={16} /> Check again</Button></div>}
+    {feedback}
     {thermometer ? <div className="intensity-question"><div className="intensity-display" aria-live="polite"><div className="intensity-value">{score ?? '—'}<span>/ 10</span></div><div><strong>{intensityLabel(score)}</strong><p>There’s no right number. Just check in with yourself.</p></div></div><Scale value={score} onChange={setScore} disabled={locked} /><div className="scale-labels"><span>1 · Not intense</span><span>10 · Very intense</span></div>{question.stage === 'thermometer_end' && fight.thermometerStart !== null && <p className="starting-intensity">You started at <strong>{fight.thermometerStart} / 10</strong>. It’s okay if things still feel difficult.</p>}<div className="actions"><Button disabled={score === null || locked} onClick={() => answer('free_text', String(score))}>Continue <ArrowRight size={18} aria-hidden="true" /></Button></div></div>
       : <>
         <div className="option-grid answer-options">
@@ -222,10 +257,7 @@ export function FightPage() {
           {count > maxAnswerChars && <p role="alert">Please keep your answer within {maxAnswerChars} characters.</p>}
         </form>}
       </>}
-    <div aria-live="polite" className="request-status">{operation.busy && <><ConversationPulse /><span>{operation.slow ? 'This is taking longer than usual.' : question.stage === 'ready' ? 'Preparing your summary…' : 'Preparing the next step…'}</span></>}</div>
-    {confirm && <Notice><p>{confirm === 'back' ? 'Going back clears your previous answer and anything after it.' : 'Skipping this topic clears your private answers for this conversation.'}</p><div className="actions"><Button disabled={locked} onClick={() => void mutate(confirm === 'back' ? 'back' : 'skip-topic', confirm === 'back' ? { turnIndex: fight.turns[fight.turns.length - 1].turnIndex } : {})}>{confirm === 'back' ? 'Go back' : 'Skip this topic'}</Button><Button variant="text" onClick={() => setConfirm(null)}>Cancel</Button></div></Notice>}
-    <div className="conversation-navigation"><Button variant="text" disabled={locked || !fight.turns.length} onClick={() => setConfirm('back')}><ArrowLeft size={16} aria-hidden="true" />Back</Button><Button variant="text" disabled={locked} onClick={() => setConfirm('skip')}>Skip this topic</Button></div>
-    {fight.turns.length > 0 && <details className="history"><summary>Your earlier answers<ChevronDown size={17} aria-hidden="true" /></summary>{fight.turns.map(turn => <div className="history-row" key={turn.turnIndex}><p className="eyebrow">{stageTitles[turn.stage]}</p><p>{turn.agentQuestion}</p><p className="your-answer">{turn.answerText}</p></div>)}</details>}
+    {navigation}
   </Page>;
 }
 
@@ -289,7 +321,9 @@ export function ResultPage() {
           : <section className="next-step"><span className="next-step-icon"><UsersRound size={24} aria-hidden="true" /></span><p className="eyebrow">The next step</p><h2>{canInvite ? 'Give your partner space to prepare.' : 'Your partner can prepare in their own time.'}</h2><p>{result.partnerStatus === 'in_progress' ? 'Your partner is preparing privately.' : 'Your answers stay private. You’ll come together with a clearer starting point.'}</p>
             {canInvite && <><div className="actions"><Button onClick={() => void copyInvite()}>{copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}{copied ? 'Link copied' : 'Copy invite link'}</Button></div>{copyError && <label className="form-field">Copy this link to share<input readOnly value={couple?.inviteUrl || ''} onFocus={e => e.currentTarget.select()} /></label>}</>}
           </section>}
-        {result.thermometerStart !== null && result.thermometerEnd !== null && <section className="thermometer-result"><h2>Your intensity check-in</h2><div className="thermometer-comparison"><div><strong>{result.thermometerStart}</strong><span>Before</span></div><ArrowRight size={24} aria-hidden="true" /><div><strong>{result.thermometerEnd}</strong><span>After</span></div></div><p>Before and after preparing, on a scale of 1–10.</p></section>}
+        {result.thermometerStart !== null && <section className="thermometer-result"><h2>Your intensity check-in</h2>{result.thermometerEnd !== null
+          ? <><div className="thermometer-comparison"><div><strong>{result.thermometerStart}</strong><span>Before</span></div><ArrowRight size={24} aria-hidden="true" /><div><strong>{result.thermometerEnd}</strong><span>After</span></div></div><p>Before and after preparing, on a scale of 1–10.</p></>
+          : <><div className="thermometer-initial"><strong>{result.thermometerStart}<span>/ 10</span></strong><span>Starting intensity</span></div><p>You recorded this before preparing. No closing intensity was recorded.</p></>}</section>}
         <p className="result-privacy"><ShieldCheck size={17} aria-hidden="true" /><span>Your personal summary stays private. Share your thoughts when you’re ready.</span></p>
       </aside>
     </div>

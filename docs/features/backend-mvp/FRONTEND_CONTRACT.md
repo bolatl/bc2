@@ -4,9 +4,9 @@
 
 Use the API origin configured for your frontend, e.g. `http://localhost:8080`. Every browser request that uses or receives an identity must include `credentials: "include"`. Cookies are HttpOnly: the browser owns them and JavaScript must not try to create or parse them. A and B need separate browser profiles/cookie jars in the demo. After a reload, fetch the saved session ID; the backend remains the authority for stage, current turn, locks, and progress.
 
-The browser onboarding flow is: create A → optionally submit personality → create fight → answer until paywall → checkout and confirm → reload the same fight → finish → fetch A's shareable invite from `/couples/me` → B previews/joins → optionally tests personality → B starts/finishes → each polls their own result → journal rating. Show privacy/disclosure copy in the frontend; there is no disclosure endpoint. Bootstrap with `/couples/me`: `partnerRole` identifies this browser and `currentSessionId` restores its own latest attempt in the current round (including terminal states). A null ID means this owner has not started that round; never substitute the partner's ID. Results provide `fightRecordId` for the exact completed round once both partners are ready; use it for rating rather than choosing the latest journal row.
+The browser onboarding flow is: create A → optionally submit personality → create fight → answer until paywall → checkout and confirm → reload the same fight → finish → fetch A's shareable invite from `/couples/me` → B previews/joins → optionally tests personality → B starts/finishes → each polls their own result → journal details and rating. With `DISABLE_PAYWALL=true`, omit the checkout steps. Show privacy/disclosure copy in the frontend; there is no disclosure endpoint. Bootstrap with `/couples/me`: `partnerRole` identifies this browser and `currentSessionId` restores its own latest available attempt in the current round (including terminal states). A null ID means there is no stored attempt for this owner, including when an incomplete attempt was lost on restart; never substitute the partner's ID. Results provide `fightRecordId` for the exact completed round once both partners are ready; use it for details and rating rather than choosing the latest journal row.
 
-Render by `currentTurn.type` / `TurnResponse.type`, not by guessed turn counts. Use `stage` to choose thermometer controls, and use `progressStageIndex` (null for thermometers) for stage progress. Submit the current zero-based `turnIndex`; disable duplicate sends while pending. Card clicks use the exact server option or omit `answerText`; free text requires a nonempty value. Thermometer free text is an integer string from `"1"` to `"10"`. The final `ready` question requires the user's explicit confirmation.
+Render by `currentTurn.type` / `TurnResponse.type`, not by guessed turn counts. Use `stage` to choose thermometer controls, and use `progressStageIndex` (null for thermometers) for stage progress. Submit the current zero-based `turnIndex`; disable duplicate sends while pending. Card clicks use the exact server option or omit `answerText`; free text requires a nonempty value. `answerText` is limited to 300 Unicode code points, counted with `[...text].length` in JavaScript and rune counting in Go. Enforce the limit for both button and Enter submission; Shift+Enter may insert a newline. Thermometer free text is an integer string from `"1"` to `"10"`. The final `ready` question requires the user's explicit confirmation.
 
 At `paywall_required`, retain the session ID and show the three returned plans with their exact prices. The private result endpoint supplies the teaser insight with an empty locked opening line. A Stripe redirect is not proof of payment: POST the checkout ID to `/subscriptions/confirm`, handle unpaid/conflict errors, then reload the original session. The mock URL is a labeled local demo flow; no card or money is used in mock mode.
 
@@ -15,6 +15,26 @@ At `safety_stop`, replace the conversation with its private resource screen and 
 Show an empty state for `[]` journal data, a missing-personality prompt for 404, an onboarding entry for 401, and plans for 402. A 409 stale turn should trigger a reload before another send. Render a checkout retry error for 502 or a generation retry error for 503 without advancing local state. Error messages are display text; use `code` and HTTP status for branching. Do not automatically retry a mutation without reconciling its current state.
 
 After both are ready, either partner can submit `{"rating": 8}` or `{"rating": null}` immediately. The null choice means “we have not talked”; omitting `rating` is invalid. `averageRating: null` must not render as zero. Poll `/couples/me` or the owner's `/result` for readiness; the backend sends no SMS or push notifications. `partnerBInviteSentAt` denotes current-round availability, not actual delivery. It resets when a new round begins.
+
+## Short flow and checkpoints
+
+`FUNNEL=short` is the default: `thermometer_start`, `facts`, `feelings`, `needs`, `ready`. `FUNNEL=full` also includes `partner_view` and `thermometer_end`. `ENABLE_REHEARSAL=true` inserts `rehearsal` before closing steps in either flow. The API does not expose a funnel configuration field: render the actual current stage and returned history. The sidebar must not promise seven steps or mark an omitted perspective stage as completed. `turnsMax` is the configured answer budget, not the number of questions that remain. Short-flow results have `thermometerEnd: null`; show only starting intensity, with no invented ending score or comparison.
+
+When `ENABLE_CHECKPOINTS=true`, a full-access session may return `CheckpointResponse` from both `/turns` and `GET /fight-sessions/{id}`. In short flow it follows `feelings`; in full flow it follows `needs`, and may also follow `partner_view` if rehearsal is enabled. The free teaser has no checkpoints.
+
+Render the private `summary` and returned `question`, with **Continue** for `decision: "continue"` and **Wrap up** for `decision: "stop"`. Send the choice to `POST /fight-sessions/{id}/checkpoint`; its response is `TurnResponse`, not `FightSessionResponse`. Continue resumes the next content stage. Wrap up skips remaining content and goes to `ready` in short flow, or `thermometer_end` then `ready` in full flow. It does not complete the preparation or notify the partner automatically.
+
+Until a checkpoint is answered, reloading returns the same checkpoint and `/turns` returns `409`. Back can reopen a previously answered turn using its index and clears the checkpoint; Skip still closes the private preparation. Disable duplicate decisions and reconcile with GET after a timeout or uncertain mutation result before allowing another send. Checkpoint summaries are private and must not be persisted in browser storage.
+
+## Journal detail and persistence
+
+The UI route `/journal/:recordId` requests `GET /journal/{fightRecordId}`. The response contains the shared `FightRecordResponse` fields at the top level and a nullable `myResult` for the current caller. It never contains the partner's private result. Display topic, dates, ratings and status separately from the private guide. Keep the shared entry visible when `myResult` is null. **Check in** targets `/journal/:recordId/rating` for that same ID. Use cache keys scoped by couple, partner role and record ID; clear private state on identity changes. Journal access requires full access (`402` otherwise); missing or foreign records return `404`.
+
+With a configured server `DATA_FILE` and a stable `SESSION_SECRET`, profiles, subscriptions, personality summaries, completed private results and journal entries survive restart. Raw answers, generated questions/cards and incomplete sessions are never written. Without `DATA_FILE`, server state is memory-only. The API exposes no persistence flag, so settings copy must describe these modes conditionally instead of claiming the local server has persistence enabled.
+
+After restart, an incomplete session URL can return `404` and `currentSessionId` becomes null. Offer a route back home and let the server decide whether a new start is allowed. Free access already consumed by A remains consumed and a new start returns `402`. B may restart its missing preparation if A's completed result remains; the saved B status can still say `in_progress` until then. A known backend limitation affects pending mock checkout: its subscription record is restored but the mock provider's checkout map is not. Retrying the saved checkout returns `409 payment_unconfirmed`; active subscriptions restore normally. Frontend retries cannot repair that provider state.
+
+The browser must keep raw text and private results out of localStorage/sessionStorage. Server persistence of a completed result does not authorize copying it into persistent browser caches.
 
 ## Mini-IPIP screen input
 
@@ -192,6 +212,7 @@ export interface PersonalityTestResponse {
 }
 
 export type SubmitTurnRequest =
+  // answerText, when present, is limited to 300 Unicode code points.
   | { turnIndex: number; answerSource: "free_text"; answerText: string }
   | { turnIndex: number; answerSource: "card_left" | "card_right"; answerText?: string };
 
@@ -210,11 +231,11 @@ export interface NextTurnResponse {
   optionLeft: string;
   /** Second answer card. */
   optionRight: string;
-  /** Stage progress: facts=1, feelings=2, needs=3, partner_view=4, rehearsal=5, ready=6; null on thermometers. */
+  /** Short: counts actual content stages (ready=4 without rehearsal). Full: historical numbering (ready=6). Null on thermometers. */
   progressStageIndex: number | null;
   /** Number of answers accepted in the current branch. */
   turnsUsed: number;
-  /** Current budget: FREE_TURNS (3 or 4) for teaser, MAX_TURNS (7–12) for full. */
+  /** Answer budget, not remaining steps: FREE_TURNS (3 or 4) for teaser, MAX_TURNS (5–12 short / 7–12 full; rehearsal adds 1 to the minimum). */
   turnsMax: number;
 }
 
@@ -243,13 +264,31 @@ export interface SafetyStopResponse {
   hotlines: (Hotline)[];
 }
 
+export interface CheckpointSummary {
+  feltText: string;
+  needText: string;
+  openingLine: string;
+}
+
+export interface CheckpointResponse {
+  type: "checkpoint";
+  afterStage: "feelings" | "needs" | "partner_view";
+  summary: CheckpointSummary;
+  question: string;
+  decisions: ("stop" | "continue")[];
+}
+
+export interface CheckpointRequest {
+  decision: "stop" | "continue";
+}
+
 export interface CompletedResponse {
   type: "completed";
   /** API path to the private session result. */
   resultUrl: string;
 }
 
-export type TurnResponse = NextTurnResponse | PaywallResponse | SafetyStopResponse | CompletedResponse;
+export type TurnResponse = NextTurnResponse | PaywallResponse | SafetyStopResponse | CheckpointResponse | CompletedResponse;
 
 export interface FightTurn {
   turnIndex: number;
@@ -344,6 +383,11 @@ export interface FightRecordResponse {
 }
 
 export type JournalResponse = (FightRecordResponse)[];
+
+export interface JournalEntryResponse extends FightRecordResponse {
+  /** Only the calling partner's derived result; null when unavailable. */
+  myResult: FightSessionResultResponse | null;
+}
 
 export interface JournalStatsResponse {
   totalFights: number;
