@@ -1,0 +1,107 @@
+# Пройти флоу до конца за обоих партнёров
+
+Инструкция для ручной проверки: партнёр A и партнёр B проходят свои сессии, у обоих `ready`, в журнале появляется общая запись, оба ставят оценку. Проверено на локальном сервере с `DISABLE_PAYWALL=true`. Все curl-запросы для копирования лежат в `CURL_EXAMPLES.md`.
+
+## 0. Подготовка
+
+1. В `.env` задайте `DISABLE_PAYWALL=true` (оплата не нужна) и `LLM_API_KEY=...` (без ключа работает мок с шаблонными вопросами).
+2. Запустите сервер: `make run-env`. В логе должно быть `llm_mode=openai` или `anthropic` (или `mock` без ключа).
+3. Подготовьте **две независимые сессии** с разными куками:
+   - Postman: два отдельных окна (или два профиля), куки не должны делиться. Либо очищайте куки перед запросами B.
+   - curl: два файла кук, например `-c a.jar -b a.jar` для A и `-c b.jar -b b.jar` для B.
+4. После каждого перезапуска сервера начинайте с самого начала: данные хранятся в памяти.
+
+База: `http://localhost:8080/api/v1`. Везде заголовок `Content-Type: application/json`.
+
+## 1. Сторона A
+
+### 1.1 Создать пару
+`POST /couples` с профилем (значения из списков, см. `CURL_EXAMPLES.md`, раздел 1). Сервер выставляет куку A.
+
+### 1.2 Начать сессию
+`POST /fight-sessions` с `{}`. Сохраните `sessionId` как `sessionIdA`.
+
+### 1.3 Пройти 7 ходов
+`POST /fight-sessions/<sessionIdA>/turns`. Номер `turnIndex` растёт от 0, этапы идут в таком порядке:
+
+| turnIndex | Этап | Что отвечать |
+|---|---|---|
+| 0 | `thermometer_start` | число от 1 до 10 строкой, например `"8"` |
+| 1 | `facts` | свободный текст: что произошло |
+| 2 | `feelings` | текст или карточка |
+| 3 | `needs` | текст или карточка |
+| 4 | `partner_view` | текст или карточка |
+| 5 | `thermometer_end` | число от 1 до 10 |
+| 6 | `ready` | текст или карточка, например `"I am ready to talk"` |
+
+Если включён `ENABLE_REHEARSAL=true`, между 4 и 5 добавляется `rehearsal`, а `thermometer_end` и `ready` получают номера 6 и 7.
+
+Тело хода:
+- свой текст: `{"turnIndex":1,"answerSource":"free_text","answerText":"..."}`;
+- левая карточка: `{"turnIndex":2,"answerSource":"card_left"}`;
+- правая карточка: `{"turnIndex":2,"answerSource":"card_right"}`.
+
+Каждый ответ возвращает следующий вопрос. Последний ход (`ready`) возвращает `{"type":"completed","resultUrl":"..."}`. Это значит, что сессия A завершена.
+
+### 1.4 Проверить, что A готов и приглашение создано
+`GET /couples/me` (кука A). В ответе `partnerBStatus: "invited"` и заполнен `inviteUrl`:
+```
+"inviteUrl": "http://localhost:5173/invites/<inviteToken>"
+```
+Токен приглашения — последняя часть адреса после `/invites/`. Сам адрес ведёт на фронтенд, для проверки бэкенда нужен только токен.
+
+## 2. Сторона B (другая кука)
+
+### 2.1 Войти по приглашению
+`POST /invites/<inviteToken>/join` с телом:
+```json
+{"age":"30-34","conflictStyle":"talk_now","repairNeed":"plan"}
+```
+Ответ: `partnerRole: "B"` и `neutralTopic` (тема, которую определил сервер по ответам A, например `chores`). Кука B выставляется автоматически.
+
+### 2.2 Начать сессию B
+`POST /fight-sessions` с `{}` (кука B). Сохраните `sessionId` как `sessionIdB`. Он отличается от `sessionIdA`.
+
+B может начать только после того, как A завершил сессию (иначе придёт `409`).
+
+### 2.3 Пройти те же 7 ходов
+`POST /fight-sessions/<sessionIdB>/turns`. Этапы и номера те же, что у A (таблица в 1.3). Последний ход возвращает `completed`.
+
+## 3. Проверить, что готовы оба
+
+Когда B ответил на `ready`, сервер создаёт общую запись журнала.
+
+- `GET /journal` (любая кука): в записи заполнен `bothReadyAt`, `status: "pending"`. Это ответ-массив, `id` записи нужен для оценки.
+- `GET /fight-sessions/<sessionIdA>/result` (кука A): `partnerStatus: "ready"`.
+- `GET /couples/me` (кука A): поле `partnerBStatus` показывает состояние партнёра B.
+
+## 4. Оценки и статистика
+
+Каждый ставит оценку своей кукой: `POST /journal/<fightRecordId>/rating`.
+
+- A: `{"rating":7}`. Ответ: `ratingA: 7`, `ratingB: null`, `status: "pending"`.
+- B: `{"rating":3}`. Ответ: `averageRating: 5`, `color: "yellow"`, `status: "rated"`, `divergenceFlag: true` (оценки отличаются на 4 и больше).
+- Вместо числа можно отправить `{"rating":null}`: «мы ещё не говорили». Поле `rating` обязательно, `null` задаётся явно.
+
+`GET /journal/stats`: `totalFights`, `topicCounts`, `averageRatingTrend`, `avgTimeToBothReadySeconds`, `recurringTopicHint` (появляется, когда одна тема встретилась не меньше 3 раз).
+
+Итоги каждого партнёра: `GET /fight-sessions/<sessionId>/result` своей кукой (поля `feltText`, `needText`, `openingLine`, `sharedRules`).
+
+## 5. Если что-то пошло не так
+
+| Ответ | Причина |
+|---|---|
+| `404 not_found` | Неверный путь, потеряна кука или запрос B ушёл с кукой A |
+| `409` на `/turns` | Неверный `turnIndex`: возьмите актуальный из `GET /fight-sessions/<sessionId>` |
+| `409` при старте B | A ещё не завершил свою сессию |
+| `402` | Пейвол включён: проверьте `DISABLE_PAYWALL=true` и перезапустите сервер |
+| `503 generation_unavailable` | Ошибка LLM-провайдера: ключ, лимит или невалидный ответ; причина в stderr сервера |
+
+## 6. Начать новый раунд
+
+Когда оба закончили, A может снова вызвать `POST /fight-sessions`, и начнётся новый раунд. Журнал накапливает записи, а статистика считается по ним.
+
+## 7. Автоматический прогон
+
+- `scripts/curl_flow.sh` проходит флоу A одной командой до итога.
+- `scripts/demo.py` проходит флоу A и B двумя партнёрами одной командой (использует мок оплаты, при `DISABLE_PAYWALL=true` пейвол не встретится).

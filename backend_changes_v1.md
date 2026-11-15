@@ -149,6 +149,7 @@ curl -X POST 'http://localhost:8080/api/v1/fight-sessions/<sessionId>/turns' \
 
 ### Проверка вручную
 
+- Пошаговая инструкция «пройти флоу до конца за A и B»: `docs/features/backend-mvp/FULL_FLOW_GUIDE.md`.
 - Postman: запросы из `docs/features/backend-mvp/CURL_EXAMPLES.md` (Import → Raw text).
 - Автопрогон: `scripts/curl_flow.sh` (полный флоу одной командой), `scripts/demo.py` (два партнёра).
 - Посмотреть созданное: `GET /couples/me`, `/fight-sessions/{id}`, `/fight-sessions/{id}/result`, `/subscriptions/me`, `/journal`, `/journal/stats`.
