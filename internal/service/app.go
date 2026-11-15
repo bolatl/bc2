@@ -65,14 +65,10 @@ func (a *App) active(coupleID string) bool {
 	return ok && s.Status == "active"
 }
 func defaultPlan(c model.Couple) string {
-	switch c.ProfileA.RelationshipStatus {
-	case "engaged":
+	if c.ProfileA.RelationshipStatus == "engaged" {
 		return "program"
-	case "married", "living_together":
-		return "yearly"
-	default:
-		return "monthly"
 	}
+	return "yearly"
 }
 func contains(s string, values ...string) bool {
 	for _, v := range values {

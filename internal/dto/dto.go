@@ -19,6 +19,7 @@ type SubscriptionResponse struct {
 type CoupleResponse struct {
 	CoupleID             string                `json:"coupleId"`
 	PartnerRole          string                `json:"partnerRole"`
+	PartnerName          string                `json:"partnerName,omitempty"`
 	CurrentSessionID     *string               `json:"currentSessionId"`
 	InviteURL            string                `json:"inviteUrl"`
 	PartnerBStatus       string                `json:"partnerBStatus"`
@@ -127,6 +128,14 @@ type FightSessionResultResponse struct {
 	Tier             string                  `json:"tier"`
 	Locked           []string                `json:"locked"`
 	Reflection       *ConversationReflection `json:"reflection,omitempty"`
+	Rehearsal        *RehearsalOptions       `json:"rehearsal,omitempty"`
+}
+
+// RehearsalOptions contains only the current person's generated opening lines.
+// These are not predictions or excerpts from their partner's private answers.
+type RehearsalOptions struct {
+	OptionA string `json:"optionA"`
+	OptionB string `json:"optionB"`
 }
 type ConversationReflection struct {
 	Summary string            `json:"summary"`

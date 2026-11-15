@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Copy, HeartHandshake, LockKeyhole, MessageCircle, MessageSquareText, Mic, MicOff, Phone, RefreshCw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Copy, HeartHandshake, LockKeyhole, MessageSquareText, Mic, MicOff, Phone, RefreshCw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react';
 import { api, ApiError } from '../api/client';
-import type { Checkout, Couple, Fight, PlanOption, Result, Subscription, TurnResponse } from '../api/types';
+import type { Checkout, Couple, Fight, Result, Subscription, TurnResponse } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page, Scale } from '../components/ui';
 import { LockedPreview } from '../components/LockedPreview';
 import { ConversationReflection } from '../components/ConversationReflection';
 import { SakuraJourney } from '../components/SakuraJourney';
 import { config } from '../config';
+import { clearCheckout, fallbackPlans, planCopy, readCheckout, saveCheckout } from './checkout-state';
 import { useSpeechToText } from '../hooks/useSpeechToText';
 import '../styles/conversation.css';
+import '../styles/prototype-flow.css';
 
 // Keep in sync with MaxAnswerChars in internal/service/fight.go.
 const maxAnswerChars = 300;
@@ -129,10 +131,11 @@ export function FightPage() {
   const operation = useOperation();
   const [draft, setDraft] = useState('');
   const [score, setScore] = useState<number | null>(null);
+  const [selected, setSelected] = useState<'card_left' | 'card_right' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [needsCheck, setNeedsCheck] = useState(false);
   const [confirm, setConfirm] = useState<'back' | 'skip' | null>(null);
-  const speech = useSpeechToText(text => setDraft(prev => appendSpeech(prev, text)));
+  const speech = useSpeechToText(text => { setSelected(null); setDraft(prev => appendSpeech(prev, text)); });
   const current = fight?.currentTurn;
   const question = current?.type === 'next_turn' ? current : null;
   const locked = operation.busy || needsCheck;
@@ -140,13 +143,13 @@ export function FightPage() {
   useEffect(() => {
     if (!fight) return;
     if (fight.status === 'completed') {
-      setDraft(''); setScore(null); setData(null);
+      setDraft(''); setScore(null); setSelected(null); setData(null);
       navigate(`/fight-sessions/${id}/result`, { replace: true });
     } else if (fight.status === 'awaiting_payment') {
-      setDraft(''); setScore(null); setData(null);
-      navigate(`/paywall?sessionId=${encodeURIComponent(id)}`, { replace: true });
+      setDraft(''); setScore(null); setSelected(null); setData(null);
+      navigate(`/fight-sessions/${encodeURIComponent(id)}/insight`, { replace: true });
     } else if (fight.status === 'stopped_safety' || fight.status === 'skipped') {
-      setDraft(''); setScore(null);
+      setDraft(''); setScore(null); setSelected(null);
     }
   }, [fight, id, navigate, setData]);
 
@@ -159,7 +162,7 @@ export function FightPage() {
       if (fresh) {
         setNeedsCheck(false);
         if (fightStep(fresh) !== before) {
-          setDraft(''); setScore(null); setMessage(null);
+          setDraft(''); setScore(null); setSelected(null); setMessage(null);
         }
       }
       operation.setBusy(false);
@@ -174,7 +177,7 @@ export function FightPage() {
     try {
       const response = await api<TurnResponse | Fight>(`/fight-sessions/${encodeURIComponent(id)}/${action}`, body, { signal: operation.controller.current.signal });
       if (!alive.current) return;
-      setDraft(''); setScore(null);
+      setDraft(''); setScore(null); setSelected(null);
       if ('sessionId' in response) {
         setData(response); setNeedsCheck(false);
       } else if (response.type === 'completed') {
@@ -182,7 +185,7 @@ export function FightPage() {
         navigate(`/fight-sessions/${id}/result`, { replace: true });
       } else if (response.type === 'paywall_required') {
         setData(null);
-        navigate(`/paywall?sessionId=${encodeURIComponent(id)}`, { replace: true });
+        navigate(`/fight-sessions/${encodeURIComponent(id)}/insight`, { replace: true });
       } else if (response.type === 'safety_stop') {
         setData({ ...fight, status: 'stopped_safety', turns: [], currentTurn: response });
       } else {
@@ -197,7 +200,7 @@ export function FightPage() {
       if (alive.current && fresh) {
         setNeedsCheck(false);
         if (fightStep(fresh) !== previousStep) {
-          setDraft(''); setScore(null); setMessage(null);
+          setDraft(''); setScore(null); setSelected(null); setMessage(null);
         }
       }
     } finally {
@@ -247,35 +250,96 @@ export function FightPage() {
   if (!question) return <Loading label="Opening the next step…" />;
 
   const thermometer = question.stage === 'thermometer_start' || question.stage === 'thermometer_end';
-  const number = question.progressStageIndex === null ? question.stage === 'thermometer_start' ? 'Before' : 'After' : String(question.progressStageIndex).padStart(2, '0');
-  // Words still being dictated show in the textarea and are sent with the answer.
+  const story = question.stage === 'facts';
+  const rehearsal = question.stage === 'rehearsal';
+  const ready = question.stage === 'ready';
+  const contextIndex = ['feelings', 'needs', 'partner_view'].indexOf(question.stage);
+  const number = thermometer ? question.stage === 'thermometer_start' ? 'Before' : 'After' : contextIndex >= 0 ? String(contextIndex + 1).padStart(2, '0') : undefined;
+  const currentScore = score ?? (question.stage === 'thermometer_end' ? fight.thermometerStart ?? 6 : 6);
   const answerText = speech.interim ? appendSpeech(draft, speech.interim) : draft;
   const count = [...answerText].length;
-  const sendAnswer = () => { if (answerText.trim() && count <= maxAnswerChars) { setDraft(answerText); answer('free_text', answerText); } };
-  return <Page transitionKey={fightStep(fight)} number={number} eyebrow={stageTitles[question.stage]} title={question.agentQuestion} className={`conversation-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} turns={fight.turns} />}>
-    <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Your private preparation</span><span>{question.turnsUsed} / {question.turnsMax} answers</span></div>
-    {question.stage === 'thermometer_start' && <ProcessingNote />}
+  const sendAnswer = () => {
+    if (count > maxAnswerChars) return;
+    if (answerText.trim()) { setDraft(answerText); answer('free_text', answerText); }
+    else if (selected && !rehearsal) answer(selected);
+  };
+  const title = thermometer ? question.stage === 'thermometer_start' ? 'How upset are you right now?' : 'How upset are you now?'
+    : story ? 'What happened? Keep it short.' : rehearsal ? 'Choose your first sentence.' : ready ? 'Ready to talk?' : question.agentQuestion;
+  const examples = ['We had friends over. I cleaned up alone afterward.', 'My partner was late and did not text.', 'We argued about money for a trip.'];
+  return <Page transitionKey={fightStep(fight)} number={number} eyebrow={contextIndex >= 0 ? `Question ${contextIndex + 1}` : stageTitles[question.stage]} title={title} className={`conversation-page prototype-conversation ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} turns={fight.turns} />}>
+    <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Only you see this</span></div>
     {feedback}
-    {thermometer ? <div className="intensity-question"><div className="intensity-display" aria-live="polite"><div className="intensity-value">{score ?? '—'}<span>/ 10</span></div><div><strong>{intensityLabel(score)}</strong><p>There’s no right number. Just check in with yourself.</p></div></div><Scale value={score} onChange={setScore} disabled={locked} /><div className="scale-labels"><span>1 · Not intense</span><span>10 · Very intense</span></div>{question.stage === 'thermometer_end' && fight.thermometerStart !== null && <p className="starting-intensity">You started at <strong>{fight.thermometerStart} / 10</strong>. It’s okay if things still feel difficult.</p>}<div className="actions"><Button disabled={score === null || locked} onClick={() => answer('free_text', String(score))}>Continue <ArrowRight size={18} aria-hidden="true" /></Button></div></div>
-      : <>
-        <div className="option-grid answer-options">
-          <button className="option answer-card" disabled={locked} onClick={() => answer('card_left')}><span className="answer-card-icon" aria-hidden="true">{question.stage === 'ready' ? <MessageCircle size={23} /> : <span>A</span>}</span><span>{question.optionLeft}</span><ArrowRight size={18} aria-hidden="true" /></button>
-          <button className="option answer-card" disabled={locked} onClick={() => answer('card_right')}><span className="answer-card-icon" aria-hidden="true">{question.stage === 'ready' ? <MessageSquareText size={23} /> : <span>B</span>}</span><span>{question.optionRight}</span><ArrowRight size={18} aria-hidden="true" /></button>
+    {thermometer ? <div className="intensity-question">
+      <div className={`intensity-display intensity-${currentScore <= 3 ? 'good' : currentScore <= 6 ? 'mid' : 'bad'}`}><output className="intensity-value" aria-live="polite">{currentScore}</output><strong>{intensityLabel(currentScore)}</strong></div>
+      <Scale value={currentScore} onChange={setScore} disabled={locked} />
+      <div className="scale-labels"><span>1 · calm</span><span>10 · furious</span></div>
+      {question.stage === 'thermometer_end' && fight.thermometerStart !== null && <div className="intensity-change"><div><span>{fight.thermometerStart}</span><ArrowRight size={24} aria-hidden="true" /><span className="intensity-after">{currentScore}</span></div><p>{fight.thermometerStart > currentScore ? `You came down ${fight.thermometerStart - currentScore} point${fight.thermometerStart - currentScore === 1 ? '' : 's'}.` : 'It’s okay if this still feels difficult. Take the time you need.'}</p></div>}
+      <div className="actions"><Button disabled={locked} onClick={() => answer('free_text', String(currentScore))}>Continue <ArrowRight size={18} aria-hidden="true" /></Button></div>
+    </div> : ready ? <><p className="lead">Take this at your own pace. Your next screen brings your plan together.</p><Button className="prototype-submit" disabled={locked} onClick={() => answer('card_left')}>See your plan<ArrowRight size={18} /></Button></> : <>
+      {rehearsal ? <RehearsalCards optionA={question.optionLeft} optionB={question.optionRight} partnerName={couple?.partnerName} selected={selected} onSelect={(choice, text) => { speech.cancel(); setSelected(choice); setDraft(text); }} disabled={locked} />
+        : !story && <div className="option-grid answer-options" aria-label="Choose an answer">
+          {([['card_left', question.optionLeft], ['card_right', question.optionRight]] as const).map(([choice, text]) => <button key={choice} className="option answer-card" aria-pressed={selected === choice} disabled={locked} onClick={() => { speech.cancel(); setSelected(choice); setDraft(''); }}><span className="answer-card-icon" aria-hidden="true">{selected === choice && <Check size={14} />}</span><span>{text}</span></button>)}
+        </div>}
+      <form className={`free-answer ${story ? 'story-answer' : ''}`} onSubmit={event => { event.preventDefault(); sendAnswer(); }}>
+        <label htmlFor="own-answer">{story ? 'Your story' : rehearsal ? 'Say it your way' : 'Or in your own words'}</label>
+        <div className="voice-field">
+          <textarea id="own-answer" value={answerText} disabled={locked} rows={story ? 4 : 2} placeholder={story ? 'One or two sentences is enough.' : rehearsal ? 'Choose a sentence above, then make it your own.' : 'What feels true for you?'} aria-describedby="answer-count" onChange={event => { if (speech.isListening) speech.cancel(); setSelected(null); setDraft(event.target.value); }} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); sendAnswer(); } }} />
+          <span className="voice-button-wrap" title={speech.isSupported ? undefined : 'Voice input works in Chrome, Edge or Safari'}><button type="button" className={`voice-button${speech.isListening ? ' is-listening' : ''}`} disabled={!speech.isSupported || locked} onClick={speech.isListening ? speech.stop : () => { setSelected(null); speech.start(); }} aria-label={!speech.isSupported ? 'Voice input works in Chrome, Edge or Safari' : speech.isListening ? 'Stop voice input' : 'Start voice input'}>{speech.isListening ? <MicOff size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}</button></span>
         </div>
-        {question.stage !== 'ready' && <form className="free-answer" onSubmit={e => { e.preventDefault(); sendAnswer(); }}>
-          <label htmlFor="own-answer">Or put it in your own words</label>
-          <div className="voice-field">
-          <textarea id="own-answer" value={answerText} disabled={locked} rows={3} placeholder="What feels true for you?" aria-describedby="answer-count" onChange={e => { if (speech.isListening) speech.cancel(); setDraft(e.target.value); }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendAnswer(); } }} />
-            <span className="voice-button-wrap" title={speech.isSupported ? undefined : 'Voice input works in Chrome, Edge or Safari'}>
-              <button type="button" className={`voice-button${speech.isListening ? ' is-listening' : ''}`} disabled={!speech.isSupported || locked} onClick={speech.isListening ? speech.stop : speech.start} aria-label={!speech.isSupported ? 'Voice input works in Chrome, Edge or Safari' : speech.isListening ? 'Stop voice input' : 'Start voice input'} title={speech.isSupported ? speech.isListening ? 'Stop voice input' : 'Speak your answer' : undefined}>{speech.isListening ? <MicOff size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}</button>
-            </span>
-          </div>
-          <p className={`voice-status${speech.error && !speech.isListening ? ' is-error' : ''}`} role="status">{speech.isListening ? <><span className="voice-dot" aria-hidden="true" />Listening…</> : speech.error}</p>
-          <div className="answer-footer"><span id="answer-count">{count} / {maxAnswerChars}<span className="keyboard-hint">Shift + Enter for a new line</span></span><Button disabled={!answerText.trim() || count > maxAnswerChars || locked} type="submit">Continue <ArrowRight size={18} aria-hidden="true" /></Button></div>
-          {count > maxAnswerChars && <p role="alert">Please keep your answer within {maxAnswerChars} characters.</p>}
-        </form>}
-      </>}
+        <p className={`voice-status${speech.error && !speech.isListening ? ' is-error' : ''}`} role="status">{speech.isListening ? <><span className="voice-dot" aria-hidden="true" />Listening…</> : speech.error}</p>
+        <div className="answer-footer"><span id="answer-count">{count} / {maxAnswerChars}</span></div>
+        {count > maxAnswerChars && <p role="alert">Please keep your answer within {maxAnswerChars} characters.</p>}
+        {story && <div className="story-examples"><p>Or start from an example</p>{examples.map(example => <button type="button" disabled={locked} key={example} onClick={() => { speech.cancel(); setSelected(null); setDraft(example); }}>{example}</button>)}</div>}
+        <Button className="prototype-submit" disabled={(!selected && !answerText.trim()) || count > maxAnswerChars || locked} type="submit">{rehearsal ? 'I’m ready' : story ? 'Continue' : 'Next'}<ArrowRight size={18} aria-hidden="true" /></Button>
+      </form>
+    </>}
+    {question.stage === 'thermometer_start' && <details className="processing-disclosure"><summary>How your answers are used</summary><ProcessingNote /></details>}
     {navigation}
+  </Page>;
+}
+
+function RehearsalCards({ optionA, optionB, partnerName, selected, onSelect, disabled, paywall }: {
+  optionA: string; optionB: string; partnerName?: string; selected?: string | null;
+  onSelect?: (choice: 'card_left' | 'card_right', text: string) => void; disabled?: boolean; paywall?: string;
+}) {
+  const name = partnerName || 'Your partner';
+  return <><div className="rehearsal-options">{([['card_left', optionA], ['card_right', optionB]] as const).map(([choice, text], index) => <section className={`rehearsal-option ${selected === choice ? 'selected' : ''}`} key={choice}>
+    <header><span>Option {index === 0 ? 'A' : 'B'}</span>{onSelect && <Button variant="secondary" disabled={disabled} aria-pressed={selected === choice} onClick={() => onSelect(choice, text)}>{selected === choice ? 'Chosen' : 'Use this'}</Button>}</header>
+    <blockquote>“{text}”</blockquote>
+    {paywall && index === 1 ? <div className="rehearsal-reaction-lock"><div className="rehearsal-blur" aria-hidden="true"><span /><span /></div><Link to={paywall}><LockKeyhole size={18} aria-hidden="true" />Explore another way to start</Link></div>
+      : <div className="rehearsal-reaction"><p><strong>Possible reaction: </strong>{index === 0 ? `${name} may need a moment before replying to a direct request.` : `${name} may find it easier to discuss a specific next step.`}</p></div>}
+  </section>)}</div><p className="rehearsal-disclaimer">These are practice scenarios, not predictions of what your partner thinks or will do.</p></>;
+}
+
+export function InsightPage() {
+  const { id = '' } = useParams();
+  const { couple } = useSession();
+  const resource = useResource<Result>(`/fight-sessions/${encodeURIComponent(id)}/result`);
+  const result = resource.data;
+  if (resource.loading) return <Loading label="Finding what’s under it…" />;
+  if (!result) return <Page title="Your first insight"><Notice>{resource.error}</Notice><Button onClick={() => void resource.load()}>Try again</Button></Page>;
+  if (result.tier === 'full') return <Navigate to={`/fight-sessions/${id}`} replace />;
+  return <Page title="Here’s what’s under it." eyebrow="Your first insight" layout="wide" className="insight-page">
+    <div className="insight-cards"><section className="insight-card"><h2>You feel</h2><p>{result.feltText}</p></section><section className="insight-card"><h2>You need</h2><p>{result.needText}</p></section><section className="insight-card insight-card-shared"><h2>A calm topic for you both</h2><p>{topicLabel(result.neutralTopic)}</p><small>Your answers stay private. Only the topic is shared with {couple?.partnerName || 'your partner'}.</small></section></div>
+    <Link className="button button-primary insight-next" to={result.rehearsal ? `/fight-sessions/${id}/rehearsal` : `/paywall?sessionId=${encodeURIComponent(id)}`}>Rehearse your first sentence<ArrowRight size={18} /></Link>
+    <details className="optional-reflection"><summary>Explore your strengths and patterns</summary><ConversationReflection reflection={result.reflection} locked={result.locked.includes('openingLine')} feltText={result.feltText} needText={result.needText} /></details>
+  </Page>;
+}
+
+export function RehearsalPreviewPage() {
+  const { id = '' } = useParams();
+  const { couple } = useSession();
+  const resource = useResource<Result>(`/fight-sessions/${encodeURIComponent(id)}/result`);
+  const result = resource.data;
+  const paywall = `/paywall?sessionId=${encodeURIComponent(id)}`;
+  if (resource.loading) return <Loading label="Opening your rehearsal…" />;
+  if (!result) return <Page title="Your rehearsal"><Notice>{resource.error}</Notice><Button onClick={() => void resource.load()}>Try again</Button></Page>;
+  if (result.tier === 'full' || !result.locked.includes('openingLine')) return <Navigate to={`/fight-sessions/${id}`} replace />;
+  if (!result.rehearsal) return <Navigate to={paywall} replace />;
+  return <Page eyebrow="Rehearsal" title="Two ways to start the talk." description={`Try the words before you say them to ${couple?.partnerName || 'your partner'}.`} layout="wide" className="rehearsal-preview-page">
+    <RehearsalCards optionA={result.rehearsal.optionA} optionB={result.rehearsal.optionB} partnerName={couple?.partnerName} paywall={paywall} />
+    <Link className="button button-primary insight-next" to={paywall}>Unlock your rehearsal<ArrowRight size={18} /></Link>
+    <Link className="text-link" to={`/fight-sessions/${id}/insight`}><ArrowLeft size={16} />Back to your insight</Link>
   </Page>;
 }
 
@@ -322,56 +386,24 @@ export function ResultPage() {
     try { await navigator.clipboard.writeText(couple.inviteUrl); setCopied(true); setCopyError(false); }
     catch { setCopyError(true); }
   }
-  return <Page eyebrow="Your personal summary" title="Your plan for the conversation." layout="wide" className={`result-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`}>
-    <div className="result-workspace">
-      <div className="result-main">
-        <section className="opening-card">
-          <div className="opening-card-top"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Only you see this</span><span className="topic-pill">{topicLabel(result.neutralTopic)}</span></div>
-          <p className="eyebrow">Your opening words</p>
-          <blockquote className="summary-line">“{result.openingLine}”</blockquote>
-          <span className="opening-card-note"><MessageCircle size={16} aria-hidden="true" />A starting point. Make it sound like you.</span>
-        </section>
-        <div className="result-reflections"><section><HeartHandshake size={22} aria-hidden="true" /><h2>What you felt</h2><p>{result.feltText}</p></section><section><Sparkles size={22} aria-hidden="true" /><h2>What you needed</h2><p>{result.needText}</p></section></div>
-        <section className="result-rules"><div className="result-section-title"><UsersRound size={22} aria-hidden="true" /><h2>Make space for each other.</h2></div>{result.sharedRules.map((rule, index) => <div className="result-rule" key={rule}><span>{index + 1}</span><p>{rule}</p></div>)}</section>
-        {result.reflection && <ConversationReflection reflection={result.reflection} />}
-      </div>
-      <aside className="result-sidebar">
-        {result.fightRecordId ? <section className="next-step"><span className="next-step-icon"><Check size={24} aria-hidden="true" /></span><p className="eyebrow">You’re both ready</p><h2>Take this into your conversation.</h2><p>When you’ve talked, come back and check in about how it went.</p><div className="actions"><Button onClick={() => navigate(`/journal/${result.fightRecordId}/rating`)}>Rate your conversation <ArrowRight size={18} aria-hidden="true" /></Button><Link to="/journal">View journal</Link></div></section>
-          : <section className="next-step"><span className="next-step-icon"><UsersRound size={24} aria-hidden="true" /></span><p className="eyebrow">The next step</p><h2>{canInvite ? 'Give your partner space to prepare.' : 'Your partner can prepare in their own time.'}</h2><p>{result.partnerStatus === 'in_progress' ? 'Your partner is preparing privately.' : 'Your answers stay private. You’ll come together with a clearer starting point.'}</p>
-            {canInvite && <><div className="actions"><Button onClick={() => void copyInvite()}>{copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}{copied ? 'Link copied' : 'Copy invite link'}</Button></div>{copyError && <label className="form-field">Copy this link to share<input readOnly value={couple?.inviteUrl || ''} onFocus={e => e.currentTarget.select()} /></label>}</>}
-          </section>}
-        {result.thermometerStart !== null && <section className="thermometer-result"><h2>Your intensity check-in</h2>{result.thermometerEnd !== null
-          ? <><div className="thermometer-comparison"><div><strong>{result.thermometerStart}</strong><span>Before</span></div><ArrowRight size={24} aria-hidden="true" /><div><strong>{result.thermometerEnd}</strong><span>After</span></div></div><p>Before and after preparing, on a scale of 1–10.</p></>
-          : <><div className="thermometer-initial"><strong>{result.thermometerStart}<span>/ 10</span></strong><span>Starting intensity</span></div><p>You recorded this before preparing. No closing intensity was recorded.</p></>}</section>}
-        <p className="result-privacy"><ShieldCheck size={17} aria-hidden="true" /><span>Your personal summary stays private. Share your thoughts when you’re ready.</span></p>
-      </aside>
+  return <Page eyebrow="You’re ready" title="Your plan for the talk." layout="wide" className={`result-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`}>
+    <div className="prototype-ready-cards">
+      <section className="opening-card"><h2>Only you see this</h2><p className="eyebrow">You feel</p><p>{result.feltText}</p><p className="eyebrow">You need</p><p>{result.needText}</p><p className="eyebrow">Your first sentence</p><blockquote className="summary-line">“{result.openingLine}”</blockquote></section>
+      <section className="result-rules"><h2>Your shared topic</h2><h3>{topicLabel(result.neutralTopic)}</h3><p className="quiet">Agreements to suggest when you talk:</p>{result.sharedRules.map((rule, index) => <div className="result-rule" key={rule}><span>{index + 1}</span><p>{rule}</p></div>)}</section>
     </div>
+    <div className="prototype-ready-bottom">
+      <section className="next-step">
+        {result.fightRecordId ? <><h2>You’re both ready.</h2><p>After the conversation, check in about how it went.</p><Button onClick={() => navigate(`/journal/${result.fightRecordId}/rating`)}>Rate your conversation<ArrowRight size={18} /></Button><Link className="text-link" to="/journal">View journal</Link></>
+          : <><h2>{canInvite ? `Invite ${couple?.partnerName || 'your partner'} to prepare.` : 'Give each other a little time.'}</h2><p>{result.partnerStatus === 'in_progress' ? 'Your partner is preparing privately.' : 'One link. A private preparation. Free for your partner.'}</p>{canInvite && <><Button onClick={() => void copyInvite()}>{copied ? <Check size={18} /> : <Copy size={18} />}{copied ? 'Link copied' : 'Copy invite link'}</Button>{copyError && <label className="form-field">Copy this link to share<input readOnly value={couple?.inviteUrl || ''} onFocus={event => event.currentTarget.select()} /></label>}</>}</>
+        }
+      </section>
+      {result.thermometerStart !== null && <section className="thermometer-result"><h2>Your check-in</h2><div className="thermometer-comparison"><div><strong>{result.thermometerStart}</strong><span>Before</span></div>{result.thermometerEnd !== null && <><ArrowRight size={24} /><div><strong>{result.thermometerEnd}</strong><span>After</span></div></>}</div><p>How upset you felt, on a scale of 1–10.</p></section>}
+    </div>
+    {result.reflection && <details className="optional-reflection"><summary>Explore your personal reflection</summary><ConversationReflection reflection={result.reflection} /></details>}
     {resource.error && <Notice>{resource.error}<Button variant="text" onClick={() => void resource.load(true)}>Check again</Button></Notice>}
-    <Link className="text-link result-home" to="/home"><ArrowLeft size={16} aria-hidden="true" />Return home</Link>
+    <Link className="text-link result-home" to="/home"><ArrowLeft size={16} />Return home</Link>
   </Page>;
 }
-
-type SavedCheckout = { coupleId: string; sessionId: string | null; checkoutSessionId: string; plan: string };
-const checkoutKey = 'lovelab.checkout';
-function saveCheckout(value: SavedCheckout) { try { sessionStorage.setItem(checkoutKey, JSON.stringify(value)); } catch { /* Server bootstrap still restores the session. */ } }
-function readCheckout(coupleId: string): SavedCheckout | null {
-  try {
-    const value = JSON.parse(sessionStorage.getItem(checkoutKey) || 'null') as SavedCheckout | null;
-    return value?.coupleId === coupleId ? value : null;
-  } catch { return null; }
-}
-function clearCheckout() { try { sessionStorage.removeItem(checkoutKey); } catch { /* Storage can be disabled. */ } }
-
-const fallbackPlans: PlanOption[] = [
-  { plan: 'monthly', priceUsd: 14.99, isDefault: false },
-  { plan: 'yearly', priceUsd: 99, isDefault: false },
-  { plan: 'program', priceUsd: 149, isDefault: false },
-];
-const planCopy: Record<string, { title: string; period: string; description: string }> = {
-  monthly: { title: 'Monthly', period: '/ month', description: 'Room to keep the conversation going.' },
-  yearly: { title: 'Yearly', period: '/ year', description: 'A shared practice, throughout the year.' },
-  program: { title: '8-week program', period: '/ 8 weeks', description: 'One payment for the 8-week plan.' },
-};
 
 export function PaywallPage() {
   const [params] = useSearchParams();
@@ -388,7 +420,9 @@ export function PaywallPage() {
   const plans = fightResource.data?.currentTurn?.type === 'paywall_required' ? fightResource.data.currentTurn.availablePlans : fallbackPlans;
   const subscription = subscriptionResource.data ?? couple?.subscription;
   const pending = subscription?.status === 'pending';
-  const selectedPlan = pending ? subscription.plan : selected || plans.find(plan => plan.isDefault)?.plan || couple?.defaultPlan || 'monthly';
+  const defaultPlan = couple?.defaultPlan || 'yearly';
+  const orderedPlans = [...plans].sort((a, b) => { const order = defaultPlan === 'program' ? ['program', 'yearly', 'monthly'] : ['yearly', 'program', 'monthly']; return order.indexOf(a.plan) - order.indexOf(b.plan); });
+  const selectedPlan = pending ? subscription.plan : selected || plans.find(plan => plan.isDefault)?.plan || defaultPlan;
 
   async function checkout() {
     if (!couple || operation.inFlight.current) return;
@@ -421,35 +455,37 @@ export function PaywallPage() {
   if (subscription?.status === 'active') return <Page title="Your shared plan is active."><Link className="button button-primary" to={id ? `/fight-sessions/${id}` : '/home'}>Continue <ArrowRight size={18} /></Link></Page>;
   if (id && (fightResource.loading || resultResource.loading)) return <Loading label="Opening your first insight…" />;
   if (id && (!fightResource.data || !resultResource.data)) return <Page title="Your first insight"><Notice>{fightResource.error || resultResource.error || 'Your insight is not available yet.'}</Notice><div className="actions"><Button onClick={() => { void fightResource.load(); void resultResource.load(); }}>Try again</Button><Link to={`/fight-sessions/${id}`}>Return to conversation</Link></div></Page>;
-  return <Page eyebrow="One plan. Both of you." title="Understand yourself. Find a way forward." description="Build on your strengths, understand the difficult moments, and make more room for each other." layout="wide" className="paywall-page">
-    <div className="paywall-workspace">
-      <div className="paywall-reflection-column">
-        <ConversationReflection
-          reflection={resultResource.data?.reflection}
-          locked
-          feltText={resultResource.data?.feltText}
-          needText={resultResource.data?.needText}
-          action={<a className="button button-secondary" href="#choose-plan">Explore your full reflection<ArrowRight size={17} /></a>}
-        />
-      </div>
-      <section className="plan-picker" id="choose-plan" aria-label="Choose a shared plan">
-        <div className="plan-picker-heading"><span className="plan-picker-icon"><UsersRound size={25} aria-hidden="true" /></span><div><h2>Put understanding into practice.</h2><p>One plan for both of your perspectives.</p></div></div>
-        <ul className="paywall-plan-benefits"><li><Check size={15} aria-hidden="true" /><span>Understand the strengths and challenges in your conversation</span></li><li><Check size={15} aria-hidden="true" /><span>Get practical ways to use your strengths and change unhelpful patterns</span></li><li><Check size={15} aria-hidden="true" /><span>Invite your partner to prepare privately, then check in together</span></li></ul>
-        <div className="plan-grid" role="radiogroup" aria-label="Choose your plan">{plans.map(plan => <label key={plan.plan} className={`plan ${selectedPlan === plan.plan ? 'selected' : ''}`}><input className="sr-only" type="radio" name="plan" value={plan.plan} checked={selectedPlan === plan.plan} disabled={operation.busy || Boolean(pending && plan.plan !== selectedPlan)} onChange={() => setSelected(plan.plan)} /><span className="plan-radio" aria-hidden="true">{selectedPlan === plan.plan && <Check size={13} />}</span><span className="plan-description"><span className="plan-heading">{planCopy[plan.plan]?.title || plan.plan}</span><span>{planCopy[plan.plan]?.description}</span></span><span className="plan-price">${plan.priceUsd}<small>{planCopy[plan.plan]?.period}</small></span></label>)}</div>
-        {pending && <Notice>Your checkout is still open. Resume it to complete the selected plan.</Notice>}
-        {error && <Notice kind="error">{error}</Notice>}
-        <div className="actions"><Button className="button-coral" disabled={operation.busy || !couple} onClick={() => void checkout()}>{operation.busy ? 'Opening checkout…' : pending ? 'Resume checkout' : 'Continue to checkout'}<ArrowRight size={18} aria-hidden="true" /></Button><Link to="/home">Not now</Link></div>
-        <p className="plan-shared-note"><LockKeyhole size={14} aria-hidden="true" />Your partner joins free. Their answers stay private.</p>
-        {config.paymentMode === 'mock' && <p className="payment-mode-note">Simulated payment — no charge. No payment details are collected.</p>}
-        {config.paymentMode === 'stripe_test' && <p className="payment-mode-note">Test payment. Use Stripe test payment details.</p>}
-        {config.paymentMode === 'disabled' && <p className="payment-mode-note">Full demo access — no payment needed.</p>}
-      </section>
-    </div>
+  return <Page eyebrow="One plan. Both of you." title="Start the talk with a sentence that works." layout="wide" className="paywall-page prototype-paywall">
+    <section className="plan-picker" aria-label="Choose a shared plan">
+      <ul className="paywall-plan-benefits"><li><Check size={16} /><span>Practice your first sentence and make it your own</span></li><li><Check size={16} /><span>A free link for {couple?.partnerName || 'your partner'} to prepare too</span></li><li><Check size={16} /><span>Personal reflections, check-ins, and your shared journal</span></li></ul>
+      <div className="plan-grid" role="radiogroup" aria-label="Choose your plan">{orderedPlans.map(plan => <label key={plan.plan} className={`plan ${selectedPlan === plan.plan ? 'selected' : ''}`}>
+        {plan.plan === defaultPlan && <span className="prototype-plan-badge">{plan.plan === 'yearly' ? 'Best value' : 'Suggested plan'}</span>}
+        <input className="sr-only" type="radio" name="plan" value={plan.plan} checked={selectedPlan === plan.plan} disabled={operation.busy || Boolean(pending && plan.plan !== selectedPlan)} onChange={() => setSelected(plan.plan)} />
+        <span className="plan-radio" aria-hidden="true">{selectedPlan === plan.plan && <Check size={13} />}</span>
+        <span className="plan-description"><span className="plan-heading">{planCopy[plan.plan]?.title || plan.plan}</span><span>{planCopy[plan.plan]?.description}</span></span>
+        <span className="plan-price">${plan.priceUsd}<small>{plan.plan === 'yearly' ? '$8.25 / month' : planCopy[plan.plan]?.period}</small></span>
+      </label>)}</div>
+      {pending && <Notice>Your checkout is still open. Resume it when you’re ready.</Notice>}
+      {error && <Notice kind="error">{error}</Notice>}
+      <div className="actions"><Button className="button-coral" disabled={operation.busy || !couple} onClick={() => void checkout()}>{operation.busy ? 'Opening checkout…' : pending ? 'Resume checkout' : 'Continue'}<ArrowRight size={18} /></Button><Link to={id ? `/fight-sessions/${id}/insight` : '/home'}>Not now</Link></div>
+      <p className="plan-shared-note">One plan covers both of you. Your partner joins free.</p>
+      {config.paymentMode === 'mock' && <p className="payment-mode-note">Demo checkout. Test card prefilled. No real charge.</p>}
+      {config.paymentMode === 'stripe_test' && <p className="payment-mode-note">Test payment. Use Stripe test payment details.</p>}
+    </section>
     {id && <div className="paywall-skip">{skipConfirm ? <Notice><p>Skipping clears your private answers for this conversation.</p><div className="actions"><Button disabled={operation.busy} onClick={() => void skip()}>Skip this topic</Button><Button variant="text" onClick={() => setSkipConfirm(false)}>Cancel</Button></div></Notice> : <Button variant="text" disabled={operation.busy} onClick={() => setSkipConfirm(true)}>Skip this topic</Button>}</div>}
   </Page>;
 }
 
 export function CheckoutSuccessPage() {
+  const [params] = useSearchParams();
+  const checkoutId = params.get('session_id') || '';
+  // Old mock return links must not activate a plan before the user submits the
+  // demo form. Real Stripe test returns keep their server verification flow.
+  if (checkoutId.startsWith('cs_mock_')) return <Navigate to={`/checkout/demo?session_id=${encodeURIComponent(checkoutId)}&demo=true`} replace />;
+  return <VerifiedCheckoutSuccessPage />;
+}
+
+function VerifiedCheckoutSuccessPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { couple, refresh } = useSession();

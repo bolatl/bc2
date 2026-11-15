@@ -5,6 +5,8 @@ import "time"
 type Actor struct{ CoupleID, PartnerRole string }
 
 type PartnerProfile struct {
+	PartnerName        string   `json:"partnerName,omitempty"`
+	Source             string   `json:"source,omitempty"`
 	Age                string   `json:"age"`
 	RelationshipStatus string   `json:"relationshipStatus"`
 	TogetherDuration   string   `json:"togetherDuration"`

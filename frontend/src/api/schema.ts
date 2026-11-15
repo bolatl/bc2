@@ -388,18 +388,25 @@ export interface components {
         /** @enum {string} */
         RecordStatus: "pending" | "rated" | "not_discussed";
         CreateCoupleRequest: {
-            age: components["schemas"]["Age"];
+            /** @description Optional partner first name supplied by this person; visible only in their own profile context. */
+            partnerName?: string;
+            /**
+             * @description Optional self-reported discovery source.
+             * @enum {string}
+             */
+            source?: "instagram_facebook" | "tiktok" | "google" | "partner_link" | "friend" | "other";
+            age?: components["schemas"]["Age"];
             relationshipStatus: components["schemas"]["RelationshipStatus"];
-            togetherDuration: components["schemas"]["TogetherDuration"];
-            hasKids: components["schemas"]["HasKids"];
+            togetherDuration?: components["schemas"]["TogetherDuration"];
+            hasKids?: components["schemas"]["HasKids"];
             conflictStyle: components["schemas"]["ConflictStyle"];
             repairNeed: components["schemas"]["RepairNeed"];
             /** @description One to three distinct topics. */
-            fightTopics: components["schemas"]["FightTopic"][];
-            goal: components["schemas"]["Goal"];
+            fightTopics?: components["schemas"]["FightTopic"][];
+            goal?: components["schemas"]["Goal"];
         };
         JoinInviteRequest: {
-            age: components["schemas"]["Age"];
+            age?: components["schemas"]["Age"];
             conflictStyle: components["schemas"]["ConflictStyle"];
             repairNeed: components["schemas"]["RepairNeed"];
         };
@@ -416,6 +423,8 @@ export interface components {
             /** @description Opaque server-generated identifier. Do not infer order or encode user data. */
             coupleId: string;
             partnerRole: components["schemas"]["PartnerRole"];
+            /** @description Partner name provided by this caller during onboarding. Omitted if unknown; never copied from the other partner's private profile. */
+            partnerName?: string;
             /** @description This owner's latest attempt in the current round, including completed, skipped or privately stopped attempts. Null if this owner has no attempt in that round; never another owner's ID. */
             currentSessionId: string | null;
             /** @description Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A. */
@@ -495,11 +504,11 @@ export interface components {
             type: "next_turn";
             stage: components["schemas"]["FightStage"];
             turnIndex: number;
-            /** @description Question for the owner of this session. */
+            /** @description One short contextual question for the owner of this session, at most twelve words. */
             agentQuestion: string;
-            /** @description First answer card. */
+            /** @description First answer card, at most eight words. */
             optionLeft: string;
-            /** @description Second answer card. */
+            /** @description Second answer card, at most eight words. */
             optionRight: string;
             /** @description Stage progress: facts=1, feelings=2, needs=3, partner_view=4, rehearsal=5, ready=6; null on thermometers. */
             progressStageIndex: number | null;
@@ -609,8 +618,13 @@ export interface components {
             feltText: string;
             /** @description Private derived need summary. */
             needText: string;
-            /** @description Private first sentence; empty while locked. */
+            /** @description Private first sentence; empty while locked. Preserves the caller's chosen or edited rehearsal line when respectful, up to 300 characters. */
             openingLine: string;
+            /** @description The caller's current generated opening-line options, available before payment when the next stage is rehearsal. Contains no predictions or private partner answers. Omitted at other stages. */
+            rehearsal?: {
+                optionA: string;
+                optionB: string;
+            };
             /** @description The same three neutral conversation rules. */
             sharedRules: string[];
             partnerStatus: components["schemas"]["PartnerBStatus"];

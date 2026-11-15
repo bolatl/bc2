@@ -4,11 +4,11 @@
 
 Use the API origin configured for your frontend, e.g. `http://localhost:8080`. Every browser request that uses or receives an identity must include `credentials: "include"`. Cookies are HttpOnly: the browser owns them and JavaScript must not try to create or parse them. A and B need separate browser profiles/cookie jars in the demo. After a reload, fetch the saved session ID; the backend remains the authority for stage, current turn, locks, and progress.
 
-The browser onboarding flow is: create A → optionally submit personality → create fight → answer until paywall → checkout and confirm → reload the same fight → finish → fetch A's shareable invite from `/couples/me` → B previews/joins → optionally tests personality → B starts/finishes → each polls their own result → journal details and rating. With `DISABLE_PAYWALL=true`, omit the checkout steps. Show privacy/disclosure copy in the frontend; there is no disclosure endpoint. Bootstrap with `/couples/me`: `partnerRole` identifies this browser and `currentSessionId` restores its own latest available attempt in the current round (including terminal states). A null ID means there is no stored attempt for this owner, including when an incomplete attempt was lost on restart; never substitute the partner's ID. Results provide `fightRecordId` for the exact completed round once both partners are ready; use it for details and rating rather than choosing the latest journal row.
+The browser onboarding uses four short steps for relationship/optional partner name, conflict style, repair need, and optional referral source. Its flow is: create A → optionally submit personality → create fight → opening intensity slider → story → three contextual questions → private insight → two-opening preview → plans → demo checkout and confirm → reload the same fight → rehearsal → final intensity slider and ready confirmation → fetch A's shareable invite from `/couples/me` → B previews/joins → optionally tests personality → B starts/finishes → each polls their own result → journal details and rating. With `DISABLE_PAYWALL=true`, omit the checkout steps. Show privacy/disclosure copy in the frontend; there is no disclosure endpoint. Bootstrap with `/couples/me`: `partnerRole` identifies this browser and `currentSessionId` restores its own latest available attempt in the current round (including terminal states). A null ID means there is no stored attempt for this owner, including when an incomplete attempt was lost on restart; never substitute the partner's ID. Results provide `fightRecordId` for the exact completed round once both partners are ready; use it for details and rating rather than choosing the latest journal row.
 
-Render by `currentTurn.type` / `TurnResponse.type`, not by guessed turn counts. Use `stage` to choose thermometer controls, and use `progressStageIndex` (null for thermometers) for stage progress. Submit the current zero-based `turnIndex`; disable duplicate sends while pending. Card clicks use the exact server option or omit `answerText`; free text requires a nonempty value. `answerText` is limited to 300 Unicode code points, counted with `[...text].length` in JavaScript and rune counting in Go. Enforce the limit for both button and Enter submission; Shift+Enter may insert a newline. Thermometer free text is an integer string from `"1"` to `"10"`. The final `ready` question requires the user's explicit confirmation.
+Render by `currentTurn.type` / `TurnResponse.type`, not by guessed turn counts. Use `stage` to choose thermometer controls, and use `progressStageIndex` (null for thermometers) for stage progress. Submit the current zero-based `turnIndex`; disable duplicate sends while pending. Card clicks select an answer without submitting; **Next** sends the exact server option or omits `answerText`. Free text requires a nonempty value. Question prompts are bounded to 12 words and cards to eight words / 60 characters, with stacked cards and a separate free-text entry. `answerText` is limited to 300 Unicode code points, counted with `[...text].length` in JavaScript and rune counting in Go. Enforce the limit for both button and Enter submission; Shift+Enter may insert a newline. Thermometer free text is an integer string from `"1"` to `"10"`. The final `ready` question requires the user's explicit confirmation.
 
-At `paywall_required`, retain the session ID and show the three returned plans with their exact prices. The private result endpoint supplies the teaser insight with an empty locked opening line. A Stripe redirect is not proof of payment: POST the checkout ID to `/subscriptions/confirm`, handle unpaid/conflict errors, then reload the original session. The mock URL is a labeled local demo flow; no card or money is used in mock mode.
+At `paywall_required`, retain the session ID and show the three returned plans with their exact prices. The private result endpoint supplies the teaser insight with an empty locked opening line. A Stripe redirect is not proof of payment: POST the checkout ID to `/subscriptions/confirm`, handle unpaid/conflict errors, then reload the original session. The mock URL opens the labeled local `/checkout/demo` form as a native modal dialog, centered on desktop and a bottom sheet on mobile, over a dimmed plan summary. It prefills `Demo User`, `4242 4242 4242 4242`, December three years from the current year, and `123`. A reload restores those demo defaults, never previously typed card data. Accept only the test number `4242 4242 4242 4242`, a nonempty test name, a current or future expiry month in `MM/YY`, and a three-digit CVC. Validate those fields in browser memory only; never send or persist them. On explicit form submission, confirm using only the issued checkout ID. No bank charge or Stripe request occurs. Loading the demo checkout, reloading it, or returning from a canceled checkout must not activate a pending plan. A direct visit to `/checkout/success` with a pending mock ID returns to the form instead of confirming automatically.
 
 At `safety_stop`, replace the conversation with its private resource screen and discard local raw conversation text. Do not broadcast a partner event. At completed/skipped state, erase local answer history and use only the allowed derived result. Never put raw answers, private results, invitation tokens, or cookie values in analytics or console logs.
 
@@ -18,7 +18,7 @@ After both are ready, either partner can submit `{"rating": 8}` or `{"rating": n
 
 ## Short flow and checkpoints
 
-`FUNNEL=short` is the default: `thermometer_start`, `facts`, `feelings`, `needs`, `ready`. `FUNNEL=full` also includes `partner_view` and `thermometer_end`. `ENABLE_REHEARSAL=true` inserts `rehearsal` before closing steps in either flow. The API does not expose a funnel configuration field: render the actual current stage and returned history. The sidebar must not promise seven steps or mark an omitted perspective stage as completed. `turnsMax` is the configured answer budget, not the number of questions that remain. Short-flow results have `thermometerEnd: null`; show only starting intensity, with no invented ending score or comparison.
+The environment examples, Compose and Render Blueprint use `FUNNEL=full`, `FREE_TURNS=5`, and `ENABLE_REHEARSAL=true` for the prototype flow. With no environment configuration the legacy `FUNNEL=short` remains the server default: `thermometer_start`, `facts`, `feelings`, `needs`, `ready`. `FUNNEL=full` also includes `partner_view` and `thermometer_end`. `ENABLE_REHEARSAL=true` inserts `rehearsal` before closing steps in either flow. The API does not expose a funnel configuration field: render the actual current stage and returned history. The sidebar must not promise seven steps or mark an omitted perspective stage as completed. `turnsMax` is the configured answer budget, not the number of questions that remain. Short-flow results have `thermometerEnd: null`; show only starting intensity, with no invented ending score or comparison.
 
 When `ENABLE_CHECKPOINTS=true`, a full-access session may return `CheckpointResponse` from both `/turns` and `GET /fight-sessions/{id}`. In short flow it follows `feelings`; in full flow it follows `needs`, and may also follow `partner_view` if rehearsal is enabled. The free teaser has no checkpoints.
 
@@ -42,9 +42,9 @@ The hosted generator receives the current owner's prior questions, answer source
 
 `FightSessionResultResponse.reflection` is optional for older results. When present, it contains a short `summary` and three to five `facets`. Each facet has `id`, `label`, `kind` (`strength` or `growth`), `explanation`, and `practice`. These are tentative themes from this conversation, not measured personality traits. Render equal-size chart sectors with no percentages or scores. Labels such as “aggressiveness” or “not willing to talk” are not supported conclusions; a reported pause is not a refusal to communicate.
 
-In the unpaid preview, summary, facet labels, and explanations are available, while `practice` is explicit JSON `null`. Blur decorative practical-step placeholders; never put withheld text in the DOM. Keep one plan-selection box beside the reflection panel. Full access returns practical steps as text, including for an existing preview; an older result with no reflection should show an honest unavailable state, not fabricated chart data. The report always belongs to the caller and contains no partner's private answers or profile.
+In the unpaid preview, summary, facet labels, and explanations are available, while `practice` is explicit JSON `null`. Blur decorative practical-step placeholders; never put withheld text in the DOM. The insight page keeps this detailed reflection in an optional expandable section; the following opening preview and compact plan page are separate screens. Never fabricate a predicted partner reaction from the two opening sentences. Full access returns practical steps as text, including for an existing preview; an older result with no reflection should show an honest unavailable state, not fabricated chart data. The report always belongs to the caller and contains no partner's private answers or profile.
 
-The reflection adds one hosted-model request when reaching the teaser paywall and one when completing the final readiness step, after safety screening. Result and reflection generate concurrently within a shared 25-second action deadline; reflection output has an 1800-token budget and a maximum 22-second budget, shortened to reserve response time. A content repair is attempted only if at least 12 seconds remain. Invalid or timed-out reflection content uses a basic, answer-based reflection whose summary explicitly identifies it as such; render that summary without hiding the qualification. Provider/configuration errors and parent cancellation still fail the request and leave the submitted turn uncommitted. Checkpoints do not request a separate reflection. Generation does not run again for GET requests. Only the completed derived report is persisted with `DATA_FILE`; raw answers remain excluded and incomplete sessions are not persisted. The existing 21 API operations remain unchanged; the schema now contains 56 components.
+The reflection adds one hosted-model request when reaching the teaser paywall and one when completing the final readiness step, after safety screening. Result and reflection generate concurrently within a shared 25-second action deadline; reflection output has an 1800-token budget and a maximum 22-second budget, shortened to reserve response time. A content repair is attempted only if at least 12 seconds remain. Invalid or timed-out reflection content uses a basic, answer-based reflection whose summary explicitly identifies it as such; render that summary without hiding the qualification. Provider/configuration errors and parent cancellation still fail the request and leave the submitted turn uncommitted. Checkpoints do not request a separate reflection. Generation does not run again for GET requests. Only the completed derived report is persisted with `DATA_FILE`; raw answers remain excluded and incomplete sessions are not persisted. The existing 21 API operations remain unchanged; the schema includes the optional rehearsal preview and onboarding additions.
 
 Generated questions, cards, results, and reflection prose use respectful, non-graphic paraphrases. User-supplied profanity or explicit descriptions are not instructions to repeat that language. Invalid output is rewritten or replaced by a safe contextual template; this does not censor the user's own answer field.
 
@@ -114,6 +114,8 @@ export type FightTopic = "money" | "chores" | "family" | "time_attention" | "pho
 
 export type Goal = "fewer_fights" | "understand_each_other" | "prepare_marriage" | "feel_close";
 
+export type ReferralSource = "instagram_facebook" | "tiktok" | "google" | "partner_link" | "friend" | "other";
+
 export type PartnerRole = "A" | "B";
 
 export type PartnerBStatus = "not_invited" | "invited" | "in_progress" | "ready";
@@ -137,19 +139,22 @@ export type SessionStatus = "in_progress" | "awaiting_payment" | "completed" | "
 export type RecordStatus = "pending" | "rated" | "not_discussed";
 
 export interface CreateCoupleRequest {
-  age: Age;
+  age?: Age;
   relationshipStatus: RelationshipStatus;
-  togetherDuration: TogetherDuration;
-  hasKids: HasKids;
+  togetherDuration?: TogetherDuration;
+  hasKids?: HasKids;
   conflictStyle: ConflictStyle;
   repairNeed: RepairNeed;
   /** One to three distinct topics. */
-  fightTopics: (FightTopic)[];
-  goal: Goal;
+  fightTopics?: (FightTopic)[];
+  goal?: Goal;
+  /** Optional name, trimmed to 1–20 Unicode characters when provided. */
+  partnerName?: string;
+  source?: ReferralSource;
 }
 
 export interface JoinInviteRequest {
-  age: Age;
+  age?: Age;
   conflictStyle: ConflictStyle;
   repairNeed: RepairNeed;
 }
@@ -173,7 +178,10 @@ export interface CoupleResponse {
   partnerBStatus: PartnerBStatus;
   /** Time invitation became shareable in the current round; null before readiness; not delivery confirmation. */
   partnerBInviteSentAt: string | null;
+  /** Program for engaged couples, yearly otherwise. */
   defaultPlan: Plan;
+  /** Own profile only; omitted when not supplied. */
+  partnerName?: string;
   subscription: SubscriptionResponse | null;
   /** Whether the current role has completed the personality test. */
   personalityDone: boolean;
@@ -247,7 +255,7 @@ export interface NextTurnResponse {
   progressStageIndex: number | null;
   /** Number of answers accepted in the current branch. */
   turnsUsed: number;
-  /** Answer budget, not remaining steps: FREE_TURNS (3 or 4) for teaser, MAX_TURNS (5–12 short / 7–12 full; rehearsal adds 1 to the minimum). */
+  /** Answer budget, not remaining steps: FREE_TURNS (3–5 for full flow; 3–4 for short flow) for teaser, MAX_TURNS (5–12 short / 7–12 full; rehearsal adds 1 to the minimum). */
   turnsMax: number;
 }
 
@@ -339,7 +347,7 @@ export interface FightSessionResultResponse {
   feltText: string;
   /** Private derived need summary. */
   needText: string;
-  /** Private first sentence; empty while locked. */
+  /** Selected or edited respectful rehearsal sentence, up to 300 characters; empty while locked. */
   openingLine: string;
   /** The same three neutral conversation rules. */
   sharedRules: (string)[];
@@ -353,6 +361,8 @@ export interface FightSessionResultResponse {
   locked: ("openingLine" | "inviteUrl")[];
   /** Optional for older results. Practical steps are null until full access. */
   reflection?: ConversationReflection;
+  /** Available when a rehearsal was generated, including its unpaid preview. */
+  rehearsal?: { optionA: string; optionB: string };
 }
 
 export interface ConversationReflection {

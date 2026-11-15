@@ -1,24 +1,24 @@
-# Love Lab backend MVP requirements
+# Kintsugi backend MVP requirements
 
 ## Source precedence and scope
 
-This implementation follows the user's explicit precedence: `LoveLab_BACKEND_PROMPT.md` first, then `LoveLab_FINAL.md`, `LoveLab_PRODUCT_BRIEF.md`, and the historical `LoveLab_dev_flow_v0.md`. These source files are local inputs excluded from version control; the requirements needed for implementation are recorded in this documentation. Older proposals for registration, card collection before the teaser, SMS, and push delivery are not requirements. The requested deliverable includes implementation and the seven contract documents.
+This implementation follows the user's explicit precedence: `LoveLab_BACKEND_PROMPT.md` first, then `LoveLab_FINAL.md`, `LoveLab_PRODUCT_BRIEF.md`, and the historical `LoveLab_dev_flow_v0.md`. These source files are local inputs excluded from version control; the requirements needed for implementation are recorded in this documentation. The later Kintsugi prototype request takes precedence for public branding, the four-step onboarding, concise contextual questions, sliders, and the prefilled demo checkout. Older proposals for registration, card collection before the teaser, SMS, and push delivery are not requirements. The requested deliverable includes implementation and the seven contract documents.
 
 The supplied workspace contained no Go skeleton or Item example. The requested `cmd/` and `internal/` structure is therefore created at the project root. Storage is in memory. Optionally (`DATA_FILE`), a JSON snapshot of couples, subscriptions, personality results, completed sessions' derived results and the journal is kept on disk so history survives a restart; raw answers, generated questions and in-progress sessions are never written, and restart durability beyond that remains out of scope. The demo is a backend API; frontend screens, public deployment, repository publication, a pitch deck, and real payment collection are separate work.
 
 ## Confirmed behavior
 
-- Partner A creates an anonymous couple with eight onboarding fields. A browser cookie identifies the couple and partner role. Partner B joins through an invitation with three personal fields. A used invite is idempotent only for the existing B cookie; unrelated browsers cannot take over that role.
+- Partner A creates an anonymous couple with relationship status, conflict style, and repair need; partner name, referral source, and legacy profile fields are optional. A browser cookie identifies the couple and partner role. Partner B joins through an invitation with conflict style and repair need; age is optional. A used invite is idempotent only for the existing B cookie; unrelated browsers cannot take over that role.
 - Either partner may submit the optional 20-answer Mini-IPIP. Scoring and the three-strength/two-tip report are deterministic, without an LLM call.
 - A structured private session uses a question, exactly two answer cards, optional free text, stage progress, an initial/final thermometer, backtracking, and topic skipping.
 - The first short session is free. Its insight can be previewed, but the opening line, partner invitation, journal, and statistics require payment. Payment resumes the same session and turn.
-- Partner A pays for the couple. Supported plans are monthly USD 14.99, yearly USD 99, and program USD 149. Engaged defaults to program; married/living together defaults to yearly; dating defaults to monthly.
+- Partner A pays for the couple. Supported plans are monthly USD 14.99, yearly USD 99, and program USD 149. Engaged defaults to program; other relationship statuses default to yearly.
 - B receives only a neutral topic, public readiness state, and shared conversation rules. Neither partner can read the other's answers, questions, personality report, or private result.
 - Safety screening runs before every LLM operation. A detected crisis stops the private session without a partner notification. Supported resources are returned as data for the private screen.
 - Completing, safety-stopping, or skipping a session deletes raw answers and generated questions/cards. Journal records contain derived shared data only.
 - When both partners complete the same round, a shared journal record permits each partner to submit an integer 1–10 or explicit null for “we have not talked.” No clock waiting is required for the demo.
 - Journal statistics include topic counts, rating trend, and mean seconds to both ready. One-click deletion removes every stored aggregate for the couple and invalidates its cookie identity and invite.
-- Rehearsal is optional, disabled by default through `ENABLE_REHEARSAL`. The same contract supports it without a second API variant.
+- The prototype environment uses `FUNNEL=full`, `FREE_TURNS=5`, and `ENABLE_REHEARSAL=true`; legacy unconfigured server behavior still supports the short flow and optional rehearsal. Current rehearsal choices can be previewed before payment. The sentence selected or written during rehearsal becomes the final opening line.
 
 ## Decisions used to close the prompt's gaps
 
@@ -32,7 +32,7 @@ These decisions are explicit implementation defaults, not newly inferred product
 6. Thermometer answers use `answerSource: "free_text"` and a string containing an integer 1–10. The source's integer rating and optional values must remain distinguishable from missing properties.
 7. A free teaser pauses; it is not a terminal completion. Its raw history is retained so an upgrade can continue. Terminal sessions cannot be reopened by backtracking.
 8. The `ready` stage is the explicit final confirmation. Completing it, rather than merely viewing the result, marks that partner ready.
-9. Monthly/yearly are recurring in Stripe test mode; program is a one-time test payment. Keyless mock checkout is a clearly marked demo shortcut and does not represent money movement.
+9. Monthly/yearly are recurring in Stripe test mode; program is a one-time test payment. Keyless mock checkout opens a clearly marked test-card form, activates the plan after explicit confirmation, and does not represent money movement. Card fields are validated only in browser memory and never sent to the backend.
 10. Generated text is educational, avoids verdicts and prohibited labels, and uses bounded structured stages. A deterministic mock is not a general language model or a comprehensive crisis classifier.
 
 ## Non-goals and operational limits

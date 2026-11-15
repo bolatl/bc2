@@ -80,7 +80,7 @@ func (s *Stripe) CreateCheckout(ctx context.Context, request CheckoutRequest) (C
 		"line_items[0][quantity]":                {"1"},
 		"line_items[0][price_data][currency]":    {"usd"},
 		"line_items[0][price_data][unit_amount]": {strconv.FormatInt(amount, 10)},
-		"line_items[0][price_data][product_data][name]": {"Love Lab " + request.Plan},
+		"line_items[0][price_data][product_data][name]": {"Kintsugi " + request.Plan},
 		"payment_method_types[0]":                       {"card"},
 	}
 	if request.Plan == "monthly" {

@@ -6,7 +6,7 @@ services:
       context: .
       args:
         VITE_LLM_MODE: ${VITE_LLM_MODE:-unknown}
-        VITE_PAYMENT_MODE: ${VITE_PAYMENT_MODE:-disabled}
+        VITE_PAYMENT_MODE: ${VITE_PAYMENT_MODE:-mock}
     environment:
       APP_ENV: production
       ADDR: :8080
@@ -19,12 +19,12 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-}
       LLM_MODEL: ${LLM_MODEL:-}
       STRIPE_SECRET_KEY: ""
-      DISABLE_PAYWALL: "true"
-      FREE_TURNS: "4"
+      DISABLE_PAYWALL: ${DISABLE_PAYWALL:-false}
+      FREE_TURNS: "5"
       MAX_TURNS: "12"
-      FUNNEL: short
+      FUNNEL: full
       ENABLE_CHECKPOINTS: "false"
-      ENABLE_REHEARSAL: "false"
+      ENABLE_REHEARSAL: "true"
     volumes:
       - app_data:/data
     read_only: true

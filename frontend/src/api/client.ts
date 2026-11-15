@@ -41,7 +41,7 @@ export async function api<T>(path: string, body?: unknown, options: { method?: s
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (options.signal?.aborted || startedGeneration !== generation) throw new DOMException('Request cancelled', 'AbortError');
-    throw new ApiError(0, 'connection_error', 'We could not reach Love Lab. Check your connection and try again.');
+    throw new ApiError(0, 'connection_error', 'We could not reach Kintsugi. Check your connection and try again.');
   } finally {
     window.clearTimeout(timeout);
     options.signal?.removeEventListener('abort', abort);

@@ -1,3 +1,4 @@
+import { answerCurrent } from './flow-helpers';
 import { expect, test, type Page } from '@playwright/test';
 import type { Checkpoint, Couple, Fight, JournalEntry, Result } from '../src/api/types';
 
@@ -12,7 +13,7 @@ async function get<T>(page: Page, path: string): Promise<T> {
 
 async function start(page: Page) {
   await page.goto('/choose');
-  await page.getByRole('button', { name: /Talk to Love Lab now/ }).click();
+  await page.getByRole('button', { name: /Talk to Kintsugi now/ }).click();
   await expect(page).toHaveURL(/\/fight-sessions\/[^/]+$/);
   return page.url().split('/').pop()!;
 }
@@ -23,23 +24,8 @@ async function create(page: Page) {
 }
 
 async function answer(page: Page, id: string, expectedStage: string, text?: string) {
-  const { currentTurn: current } = await get<Fight>(page, `/fight-sessions/${id}`);
-  if (current?.type !== 'next_turn') throw new Error(`Expected ${expectedStage}, got ${current?.type}`);
-  expect(current.stage).toBe(expectedStage);
-  await expect(page.getByRole('heading', { name: current.agentQuestion, exact: true })).toBeVisible();
-  if (current.stage === 'thermometer_start') {
-    await page.getByRole('radio', { name: '8', exact: true }).check();
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  } else if (text !== undefined) {
-    await page.getByLabel('Or put it in your own words').fill(text);
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  } else {
-    await page.getByRole('button', { name: current.optionLeft, exact: true }).click();
-  }
-  await expect.poll(async () => {
-    const next = (await get<Fight>(page, `/fight-sessions/${id}`)).currentTurn;
-    return next?.type !== 'next_turn' || next.turnIndex !== current.turnIndex;
-  }).toBeTruthy();
+  expect((await get<Fight>(page, `/fight-sessions/${id}`)).stage).toBe(expectedStage);
+  await answerCurrent(page, API, id, text, 8);
 }
 
 async function checkpoint(page: Page, id: string, feelings = 'I felt alone doing the dishes.') {
@@ -79,7 +65,6 @@ async function finish(page: Page, id: string) {
   expect(result.thermometerEnd).toBeNull();
   await expect(page.locator('.thermometer-result')).toContainText('8');
   await expect(page.locator('.thermometer-result')).not.toContainText('After');
-  await expect(page.locator('.thermometer-comparison')).toHaveCount(0);
   return result;
 }
 
@@ -150,7 +135,7 @@ test('checkpoint back rewinds its answer and skipping clears the private prepara
 test('free answers count Unicode code points and accept exactly 300', async ({ page }) => {
   const id = await create(page);
   await answer(page, id, 'thermometer_start');
-  const input = page.getByLabel('Or put it in your own words');
+  const input = page.getByLabel('Your story', { exact: true });
   await input.fill('🙂'.repeat(301));
   await expect(page.locator('#answer-count')).toContainText('301 / 300');
   await expect(page.getByRole('alert')).toContainText('Please keep your answer within 300 characters.');
@@ -182,8 +167,8 @@ test('journal details show each partner their own summary and reject another cou
       await b.getByRole('radio').first().check();
       await b.getByRole('button', { name: step === 2 ? 'Save and continue' : 'Continue', exact: true }).click();
     }
-    await expect(b).toHaveURL(/\/choose$/);
-    const idB = await start(b);
+    await expect(b).toHaveURL(/\/fight-sessions\/[^/]+$/);
+    const idB = b.url().split('/').pop()!;
     await checkpoint(b, idB, 'I felt worried that we would argue again.');
     await decide(b, idB, 'continue');
     await answer(b, idB, 'needs', 'I needed warmth and closeness.');

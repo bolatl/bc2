@@ -4,10 +4,13 @@ import (
 	"lovelab/internal/dto"
 	"lovelab/internal/model"
 	"net/url"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 func validateProfile(p model.PartnerProfile, full bool) error {
-	if !contains(p.Age, "25-29", "30-34", "35-39", "40-45", "other") {
+	if p.Age != "" && !contains(p.Age, "25-29", "30-34", "35-39", "40-45", "other") {
 		return invalid("Choose a valid age range.")
 	}
 	if !contains(p.ConflictStyle, "talk_now", "need_space", "get_loud", "shut_down") {
@@ -19,19 +22,28 @@ func validateProfile(p model.PartnerProfile, full bool) error {
 	if !full {
 		return nil
 	}
+	if p.PartnerName != "" {
+		name := strings.TrimSpace(p.PartnerName)
+		if name == "" || utf8.RuneCountInString(name) > 20 || strings.IndexFunc(name, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) >= 0 {
+			return invalid("partnerName must contain between one and twenty visible characters.")
+		}
+	}
+	if p.Source != "" && !contains(p.Source, "instagram_facebook", "tiktok", "google", "partner_link", "friend", "other") {
+		return invalid("Choose a valid source.")
+	}
 	if !contains(p.RelationshipStatus, "dating", "living_together", "engaged", "married") {
 		return invalid("Choose a valid relationshipStatus.")
 	}
-	if !contains(p.TogetherDuration, "<1", "1-3", "3-7", "7+") {
+	if p.TogetherDuration != "" && !contains(p.TogetherDuration, "<1", "1-3", "3-7", "7+") {
 		return invalid("Choose a valid togetherDuration.")
 	}
-	if !contains(p.HasKids, "no", "expecting", "yes") {
+	if p.HasKids != "" && !contains(p.HasKids, "no", "expecting", "yes") {
 		return invalid("Choose a valid hasKids value.")
 	}
-	if !contains(p.Goal, "fewer_fights", "understand_each_other", "prepare_marriage", "feel_close") {
+	if p.Goal != "" && !contains(p.Goal, "fewer_fights", "understand_each_other", "prepare_marriage", "feel_close") {
 		return invalid("Choose a valid goal.")
 	}
-	if len(p.FightTopics) < 1 || len(p.FightTopics) > 3 {
+	if (p.FightTopics != nil && len(p.FightTopics) < 1) || len(p.FightTopics) > 3 {
 		return invalid("Choose between one and three fightTopics.")
 	}
 	seen := map[string]bool{}
@@ -49,6 +61,7 @@ func (a *App) CreateCouple(p dto.CreateCoupleRequest) (dto.CoupleResponse, model
 	if err := validateProfile(p, true); err != nil {
 		return dto.CoupleResponse{}, model.Actor{}, err
 	}
+	p.PartnerName = strings.TrimSpace(p.PartnerName)
 	c := model.Couple{ID: newID(), ProfileA: p, InviteToken: newID(), PartnerBStatus: "not_invited", CreatedAt: a.Now()}
 	a.Couples.Put(c.ID, c)
 	actor := model.Actor{CoupleID: c.ID, PartnerRole: "A"}
@@ -65,6 +78,11 @@ func (a *App) CoupleMe(actor model.Actor) (dto.CoupleResponse, error) {
 }
 func (a *App) coupleResponse(c model.Couple, actor model.Actor) dto.CoupleResponse {
 	out := dto.CoupleResponse{CoupleID: c.ID, PartnerRole: actor.PartnerRole, PartnerBStatus: c.PartnerBStatus, PartnerBInviteSentAt: c.InviteSentAt, DefaultPlan: defaultPlan(c), CreatedAt: c.CreatedAt}
+	if actor.PartnerRole == "A" {
+		out.PartnerName = c.ProfileA.PartnerName
+	} else if c.ProfileB != nil {
+		out.PartnerName = c.ProfileB.PartnerName
+	}
 	// Restore only this actor's own attempt in the current round. Completed,
 	// skipped and privately stopped attempts remain reloadable by their owner.
 	first, second := a.roundSessions(c.ID, c.CurrentRoundID)

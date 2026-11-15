@@ -479,7 +479,7 @@
         "plan": "yearly"
       },
       "response": {
-        "checkoutUrl": "http://localhost:5173/checkout/success?session_id=cs_mock_example&demo=true",
+        "checkoutUrl": "http://localhost:5173/checkout/demo?session_id=cs_mock_example&demo=true",
         "checkoutSessionId": "cs_mock_example"
       }
     },
@@ -492,7 +492,7 @@
         "plan": "yearly"
       },
       "response": {
-        "checkoutUrl": "http://localhost:5173/checkout/success?session_id=cs_mock_example&demo=true",
+        "checkoutUrl": "http://localhost:5173/checkout/demo?session_id=cs_mock_example&demo=true",
         "checkoutSessionId": "cs_mock_example"
       }
     },

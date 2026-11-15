@@ -6,19 +6,27 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
 
 func TestMockOnlyConfirmsIssuedCheckoutForSameCoupleAndPlan(t *testing.T) {
-	client := NewMock("http://localhost:3000")
+	client := NewMock("http://localhost:3000/")
 	ctx := context.Background()
 	checkout, err := client.CreateCheckout(ctx, CheckoutRequest{CoupleID: "couple-a", Plan: "monthly"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(checkout.CheckoutSessionID, "cs_mock_") || !strings.Contains(checkout.CheckoutURL, "demo=true") {
+	if !strings.HasPrefix(checkout.CheckoutSessionID, "cs_mock_") {
 		t.Fatal(checkout)
+	}
+	destination, err := url.Parse(checkout.CheckoutURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if destination.Scheme != "http" || destination.Host != "localhost:3000" || destination.Path != "/checkout/demo" || destination.Query().Get("session_id") != checkout.CheckoutSessionID || destination.Query().Get("demo") != "true" {
+		t.Fatalf("checkout must open the demo form for the issued session: %s", checkout.CheckoutURL)
 	}
 	if err := client.VerifyCheckout(ctx, checkout.CheckoutSessionID, "couple-a", "monthly"); err != nil {
 		t.Fatal(err)

@@ -1,4 +1,4 @@
-export type ProfileField = 'age' | 'relationshipStatus' | 'togetherDuration' | 'hasKids' | 'conflictStyle' | 'repairNeed' | 'fightTopics' | 'goal';
+export type ProfileField = 'age' | 'relationshipStatus' | 'togetherDuration' | 'hasKids' | 'conflictStyle' | 'repairNeed' | 'fightTopics' | 'goal' | 'partnerName' | 'source';
 
 export type ProfileQuestion = {
   key: ProfileField;
@@ -9,17 +9,17 @@ export type ProfileQuestion = {
 };
 
 export const profileQuestions: ProfileQuestion[] = [
-  { key: 'age', title: 'How old are you?', description: 'Choose your age range.', options: [['25-29', '25–29'], ['30-34', '30–34'], ['35-39', '35–39'], ['40-45', '40–45'], ['other', 'Another age range']] },
-  { key: 'relationshipStatus', title: 'Where are you in your relationship?', options: [['dating', 'Dating'], ['living_together', 'Living together'], ['engaged', 'Engaged'], ['married', 'Married']] },
-  { key: 'togetherDuration', title: 'How long have you been together?', options: [['<1', 'Less than a year'], ['1-3', '1–3 years'], ['3-7', '3–7 years'], ['7+', 'More than 7 years']] },
-  { key: 'hasKids', title: 'Do you have children?', options: [['no', 'No'], ['expecting', 'We’re expecting'], ['yes', 'Yes']] },
-  { key: 'conflictStyle', title: 'When a conversation gets difficult, what do you tend to do?', options: [['talk_now', 'Want to talk right away'], ['need_space', 'Need some space'], ['get_loud', 'Raise my voice'], ['shut_down', 'Go quiet']] },
-  { key: 'repairNeed', title: 'What helps you reconnect?', options: [['being_heard', 'Feeling heard'], ['apology', 'An apology'], ['plan', 'A clear plan'], ['closeness', 'A little closeness'], ['alone_time', 'Some time alone']] },
-  { key: 'fightTopics', title: 'What tends to come between you?', description: 'Choose one to three topics.', multiple: true, options: [['money', 'Money'], ['chores', 'Housework'], ['family', 'Family'], ['time_attention', 'Time and attention'], ['phone', 'Phones'], ['jealousy', 'Jealousy'], ['closeness', 'Closeness'], ['plans_decisions', 'Plans and decisions'], ['kids', 'Children'], ['other', 'Something else']] },
-  { key: 'goal', title: 'What would you like to work toward?', options: [['fewer_fights', 'Fewer arguments'], ['understand_each_other', 'Understanding each other'], ['prepare_marriage', 'Preparing for marriage'], ['feel_close', 'Feeling closer']] },
+  { key: 'conflictStyle', title: 'In a fight, you usually…', description: 'Tap one. We’ll use it to shape your guidance.', options: [['get_loud', 'Raise my voice'], ['shut_down', 'Go quiet'], ['talk_now', 'Try to fix it fast'], ['need_space', 'Leave the room']] },
+  { key: 'repairNeed', title: 'After a fight, what helps you most?', options: [['alone_time', 'Some space first'], ['being_heard', 'Talking it out'], ['closeness', 'A hug'], ['apology', 'Hearing “sorry”']] },
+  { key: 'source', title: 'How did you find us?', options: [['instagram_facebook', 'Instagram or Facebook'], ['tiktok', 'TikTok'], ['google', 'Google search'], ['partner_link', 'My partner sent a link'], ['friend', 'A friend'], ['other', 'Something else']] },
 ];
 
-export const partnerQuestions = profileQuestions.filter(({ key }) => ['age', 'conflictStyle', 'repairNeed'].includes(key));
+export const relationshipOptions = [['dating', 'Dating'], ['engaged', 'Engaged'], ['married', 'Married']] as const;
+
+export const partnerQuestions: ProfileQuestion[] = [
+  { key: 'age', title: 'How old are you?', options: [['25-29', '25–29'], ['30-34', '30–34'], ['35-39', '35–39'], ['40-45', '40–45'], ['other', 'Another age range']] },
+  ...profileQuestions.filter(({ key }) => key === 'conflictStyle' || key === 'repairNeed'),
+];
 
 // Canonical Mini-IPIP order from docs/features/backend-mvp/FRONTEND_CONTRACT.md.
 export const personalityQuestions = [

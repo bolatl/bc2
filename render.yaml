@@ -1,4 +1,5 @@
 # Free judges demo. Local JSON files reset when the free service sleeps/restarts.
+# Demo card checkout uses the local mock provider; no charges or Stripe account.
 # No paid disk, database, or payment provider is provisioned.
 services:
   - type: web
@@ -19,7 +20,7 @@ services:
       - key: DATA_FILE
         value: /tmp/lovelab/data.json
       - key: DISABLE_PAYWALL
-        value: "true"
+        value: "false"
       - key: STRIPE_SECRET_KEY
         value: ""
       - key: LLM_API_KEY
@@ -29,14 +30,14 @@ services:
       - key: VITE_LLM_MODE
         value: unknown
       - key: VITE_PAYMENT_MODE
-        value: disabled
+        value: mock
       - key: FUNNEL
-        value: short
+        value: full
       - key: FREE_TURNS
-        value: "4"
+        value: "5"
       - key: MAX_TURNS
         value: "12"
       - key: ENABLE_CHECKPOINTS
         value: "false"
       - key: ENABLE_REHEARSAL
-        value: "false"
+        value: "true"

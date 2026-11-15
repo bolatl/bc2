@@ -88,7 +88,7 @@ func main() {
 		stopSaving()
 		close(stopped)
 	}()
-	slog.Info("Love Lab backend listening", "address", cfg.Addr, "environment", cfg.Environment, "llm_mode", llmMode, "data_file", cfg.DataFile, "payment_mode", paymentMode, "serving_frontend", cfg.StaticDir != "")
+	slog.Info("Kintsugi backend listening", "address", cfg.Addr, "environment", cfg.Environment, "llm_mode", llmMode, "data_file", cfg.DataFile, "payment_mode", paymentMode, "serving_frontend", cfg.StaticDir != "")
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server failed", "error", err)
 		os.Exit(1)

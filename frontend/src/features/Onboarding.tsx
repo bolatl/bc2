@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, HeartHandshake, Lightbulb, Link2, LockKeyhole, MessageCircle, MessageCircleHeart, ShieldCheck, Sparkles } from 'lucide-react';
 import { api, ApiError } from '../api/client';
@@ -7,7 +7,7 @@ import type { CreateCouple, Fight, Invite, JoinInvite, Personality } from '../ap
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page } from '../components/ui';
 import { SakuraBough } from '../components/SakuraBackdrop';
-import { partnerQuestions, personalityQuestions, personalityScale, profileQuestions, type ProfileField, type ProfileQuestion } from '../content/profile';
+import { partnerQuestions, personalityQuestions, personalityScale, profileQuestions, relationshipOptions, type ProfileField, type ProfileQuestion } from '../content/profile';
 
 import '../styles/onboarding.css';
 
@@ -47,20 +47,22 @@ export function WelcomePage() {
   return <div className="welcome-page">
     <section className="welcome-hero">
       <div className="welcome-copy">
-        <p className="welcome-kicker"><span aria-hidden="true" />For the conversations that matter</p>
-        <h1>Better conversations<br />start <span>before<br className="welcome-break" /> you talk.</span></h1>
-        <p className="welcome-lead">A little space to understand what you feel, find the words, and come back to each other.</p>
+        <p className="welcome-kicker"><span aria-hidden="true" />For couples who keep having the same fight</p>
+        <h1>Rehearse the first sentence <span>before you say it.</span></h1>
+        <p className="welcome-lead">Prepare in private. Find the words, try a different opening, and come back ready to talk.</p>
         {error && <Notice kind="error">{error} <button className="text-link" onClick={() => { void refresh().catch(() => undefined); }}>Try connecting again</button></Notice>}
-        <div className="welcome-actions">
-          {loading ? <Loading label="Checking your session…" /> : <Link className="button button-primary button-coral" to={couple ? '/home' : '/onboarding'}>{couple ? 'Continue' : 'Get started'}<ArrowRight size={19} aria-hidden="true" /></Link>}
-          <a href="#how-it-works" className="welcome-how-link">How it works<ChevronDown size={16} aria-hidden="true" /></a>
+        <div className="welcome-actions welcome-entry-actions">
+          {loading ? <Loading label="Checking your session…" /> : couple ? <Link className="button button-primary" to="/home">Continue<ArrowRight size={19} aria-hidden="true" /></Link> : <>
+            <Link className="button button-primary" to="/onboarding">We just had a fight<ArrowRight size={19} aria-hidden="true" /></Link>
+            <Link className="button button-secondary" to="/onboarding?entry=engaged">We’re engaged. Prepare us<ArrowRight size={19} aria-hidden="true" /></Link>
+          </>}
         </div>
         <p className="welcome-private"><LockKeyhole size={14} aria-hidden="true" />Prepare privately. Invite your partner when you’re ready.</p>
       </div>
       <div className="welcome-example" aria-labelledby="example-heading">
         <SakuraBough className="welcome-bough" />
         <div className="example-heading-row"><span className="example-icon"><MessageCircleHeart size={24} aria-hidden="true" /></span><span className="example-label">Conversation example</span></div>
-        <h2 id="example-heading">Same moment.<br />A different way to start.</h2>
+        <h2 id="example-heading">Same moment.<br />Two ways to start.</h2>
         <div className="example-sentence example-sentence-before">
           <span className="example-caption">When the words come out sharp</span>
           <blockquote>“You never help.”</blockquote>
@@ -76,18 +78,18 @@ export function WelcomePage() {
       </div>
     </section>
     <section className="welcome-process" id="how-it-works" aria-labelledby="process-heading">
-      <div className="welcome-section-heading"><div><p className="eyebrow">A calmer way through</p><h2 id="process-heading">A little preparation. A better beginning.</h2></div><p>You don’t have to find all the right words at once.</p></div>
-      <div className="process-grid" aria-label="How Love Lab works">
-        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-you"><MessageCircle size={24} aria-hidden="true" /></span><span className="process-number">01</span></div><h3>Prepare separately</h3><p>Tell your side, explore what you feel, and understand what you need.</p></article>
-        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-partner"><HeartHandshake size={24} aria-hidden="true" /></span><span className="process-number">02</span></div><h3>Talk together</h3><p>Invite your partner to prepare too. Bring your own first sentence to the conversation.</p></article>
-        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-neutral"><Sparkles size={24} aria-hidden="true" /></span><span className="process-number">03</span></div><h3>Check in</h3><p>Reflect on how it went and see the patterns in your shared journal.</p></article>
+      <div className="welcome-section-heading"><div><p className="eyebrow">How it works</p><h2 id="process-heading">A few small steps before the talk.</h2></div><p>One moment. Your feelings. A first sentence.</p></div>
+      <div className="process-grid" aria-label="How Kintsugi works">
+        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-you"><MessageCircle size={24} aria-hidden="true" /></span><span className="process-number">01</span></div><h3>Tell what happened</h3><p>One or two sentences, then a few quick questions.</p></article>
+        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-partner"><HeartHandshake size={24} aria-hidden="true" /></span><span className="process-number">02</span></div><h3>See what’s underneath</h3><p>What you feel, what you need, and a calm topic to discuss.</p></article>
+        <article className="process-card"><div className="process-card-top"><span className="process-icon process-icon-neutral"><Sparkles size={24} aria-hidden="true" /></span><span className="process-number">03</span></div><h3>Rehearse, then talk</h3><p>Try an opening line. Invite your partner to prepare too.</p></article>
       </div>
       <div className="welcome-trust"><span><ShieldCheck size={18} aria-hidden="true" />No verdict on who’s right</span><span><LockKeyhole size={18} aria-hidden="true" />Your raw answers stay private</span><span><Link2 size={18} aria-hidden="true" />One plan for both of you</span></div>
     </section>
     <section className="welcome-faq" id="questions" aria-labelledby="faq-heading"><div><p className="eyebrow">Before you begin</p><h2 id="faq-heading">A few things<br />you might wonder.</h2></div><div className="welcome-faq-list">
       <details><summary>Does my partner need an account?<ChevronDown size={18} aria-hidden="true" /></summary><p>No. Share your invitation once your preparation is complete and your plan is active. Your partner opens it in their own browser, answers three questions, and prepares privately.</p></details>
       <details><summary>Will my partner see what I write?<ChevronDown size={18} aria-hidden="true" /></summary><p>Your answers and personal guide are private. The shared journal contains the conversation topic, dates, and check-ins.</p></details>
-      <details><summary>Is Love Lab therapy?<ChevronDown size={18} aria-hidden="true" /></summary><p>Love Lab is an AI-powered educational tool for preparing a conversation. It is not therapy or a substitute for professional care.</p></details>
+      <details><summary>Is Kintsugi therapy?<ChevronDown size={18} aria-hidden="true" /></summary><p>Kintsugi is an AI-powered educational tool for preparing a conversation. It is not therapy or a substitute for professional care.</p></details>
     </div></section>
   </div>;
 }
@@ -137,14 +139,73 @@ function ProfileWizard({ questions, onComplete, busy, error, partner = false }: 
   </Page>;
 }
 
+function InitialProfileWizard({ engaged, onComplete, busy, error }: {
+  engaged: boolean; onComplete: (answers: Answers) => void; busy: boolean; error: string;
+}) {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState<Answers>({ partnerName: '', relationshipStatus: engaged ? 'engaged' : 'married' });
+  const [advancing, setAdvancing] = useState(false);
+  const timer = useRef<number | null>(null);
+  useEffect(() => () => { if (timer.current !== null) window.clearTimeout(timer.current); }, []);
+  const question = step > 0 ? profileQuestions[step - 1] : null;
+  const title = question?.title ?? 'Who’s this about?';
+  const partnerName = String(answers.partnerName ?? '');
+  const pending = busy || advancing;
+
+  function choose(value: string) {
+    if (!question || pending) return;
+    const next = { ...answers, [question.key]: value };
+    setAnswers(next);
+    setAdvancing(true);
+    timer.current = window.setTimeout(() => {
+      setAdvancing(false);
+      timer.current = null;
+      if (step === 3) onComplete(next);
+      else setStep(previous => previous + 1);
+    }, 250);
+  }
+
+  return <Page transitionKey={`initial-profile-${step}`} className="wizard-page initial-profile-page" layout="wide" eyebrow={`A little about you · ${step + 1} of 4`} title={title} description={question?.description}>
+    <div className="initial-profile-topbar">
+      {step === 0 ? <Link to="/" className="initial-profile-back" aria-label="Back to welcome"><ChevronLeft size={20} aria-hidden="true" /></Link>
+        : <Button variant="text" className="initial-profile-back" disabled={pending} onClick={() => setStep(previous => previous - 1)} aria-label="Back"><ChevronLeft size={20} aria-hidden="true" /></Button>}
+      <div className="wizard-progress" role="progressbar" aria-label="Profile questions" aria-valuemin={0} aria-valuemax={4} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) * 25}%` }} /></div>
+      <span className="initial-profile-count">{step + 1} / 4</span>
+    </div>
+    <form onSubmit={event => { event.preventDefault(); if (step === 0 && partnerName.trim() && !pending) { setAnswers(previous => ({ ...previous, partnerName: partnerName.trim() })); setStep(1); } }} className="stack">
+      {step === 0 ? <>
+        <label className="initial-profile-name" htmlFor="partner-name">Your partner’s first name
+          <input id="partner-name" name="partnerName" autoComplete="off" placeholder="First name" value={partnerName} maxLength={40} onChange={event => setAnswers(previous => ({ ...previous, partnerName: Array.from(event.target.value).slice(0, 20).join('') }))} required aria-describedby="partner-name-help" />
+        </label>
+        <span className="quiet initial-profile-name-help" id="partner-name-help">So the conversation feels personal.</span>
+        <fieldset className="form-field initial-relationship" disabled={pending}><legend>You are</legend><div className="initial-relationship-options">
+          {relationshipOptions.map(([value, label]) => <label className={`initial-relationship-chip ${answers.relationshipStatus === value ? 'selected' : ''}`} key={value}>
+            <input className="sr-only" type="radio" name="relationshipStatus" value={value} checked={answers.relationshipStatus === value} onChange={() => setAnswers(previous => ({ ...previous, relationshipStatus: value }))} />{label}
+          </label>)}
+        </div></fieldset>
+        <Button className="initial-profile-continue" type="submit" disabled={!partnerName.trim() || pending}>Continue<ArrowRight size={18} aria-hidden="true" /></Button>
+      </> : question && <fieldset className="form-field" disabled={pending}>
+        <legend className="sr-only">{title}</legend>
+        <div className="initial-profile-choices">{question.options.map(([value, label]) => <button className={`option initial-profile-option ${answers[question.key] === value ? 'selected' : ''}`} key={value} type="button" aria-pressed={answers[question.key] === value} disabled={pending} onClick={() => choose(value)}>
+          <span className="initial-profile-dot" aria-hidden="true">{answers[question.key] === value && <Check size={13} />}</span><span>{label}</span><ArrowRight className="initial-profile-option-arrow" size={17} aria-hidden="true" />
+        </button>)}</div>
+      </fieldset>}
+      <div aria-live="polite" className="initial-profile-status">{busy ? 'Saving your profile…' : advancing ? 'Selected. Moving on…' : step > 0 ? 'Tap an answer to continue.' : ''}</div>
+      {error && <Notice kind="error">{error}{step === 3 && <Button variant="text" disabled={pending} onClick={() => onComplete(answers)}>Try again</Button>}</Notice>}
+      <p className="wizard-privacy"><LockKeyhole size={15} aria-hidden="true" /><span>Your answers help shape your private preparation.</span></p>
+    </form>
+  </Page>;
+}
+
 export function OnboardingPage() {
   const { couple, loading, refresh } = useSession();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { busy, error, run } = useAction();
   const creating = useRef(false);
   if (loading) return <Loading />;
   if (couple && !creating.current) return <Navigate to="/home" replace />;
-  return <ProfileWizard questions={profileQuestions} busy={busy} error={error} onComplete={(answers) => { creating.current = true; void run(async (signal) => {
+  return <InitialProfileWizard engaged={params.get('entry') === 'engaged'} busy={busy} error={error} onComplete={(answers) => { creating.current = true; void run(async (signal) => {
     try { await api('/couples', answers as CreateCouple, { signal }); }
     catch (err) {
       if (!signal.aborted) {
@@ -155,7 +216,14 @@ export function OnboardingPage() {
     }
     if (signal.aborted) return;
     await refresh();
-    navigate('/choose', { replace: true });
+    if (signal.aborted) return;
+    try {
+      const fight = await api<Fight>('/fight-sessions', {}, { signal });
+      await refresh();
+      if (!signal.aborted) navigate(`/fight-sessions/${fight.sessionId}`, { replace: true });
+    } catch {
+      if (!signal.aborted) navigate('/choose', { replace: true });
+    }
   }); }} />;
 }
 
@@ -184,7 +252,7 @@ export function ChoosePage() {
     <div className="choose-grid">
       <button className="choose-card choose-card-conversation" disabled={busy} onClick={() => { void run(start); }}>
         <span className="choose-card-top"><span className="choose-icon"><MessageCircleHeart size={30} aria-hidden="true" /></span><span className="choose-pill">Start here</span></span>
-        <span className="choose-card-copy"><strong>{busy ? 'Getting ready…' : couple.currentSessionId ? 'Continue your conversation' : 'Talk to Love Lab now'}</strong><span>Make sense of what happened and find a first sentence that feels like you.</span></span>
+        <span className="choose-card-copy"><strong>{busy ? 'Getting ready…' : couple.currentSessionId ? 'Continue your conversation' : 'Talk to Kintsugi now'}</strong><span>Make sense of what happened and find a first sentence that feels like you.</span></span>
         <span className="choose-card-bottom">Your private preparation<ArrowUpRight size={23} aria-hidden="true" /></span>
       </button>
       <Link className="choose-card choose-card-profile" to={couple.personalityDone ? '/personality/result' : '/personality'}>
@@ -273,7 +341,7 @@ export function InvitePage() {
     });
     return () => controller.abort();
   }, [token, attempt]);
-  if (previewError) return <Page eyebrow="Partner invitation" title="Let’s find your invitation."><Notice>{previewError}</Notice><div className="actions"><Button onClick={() => setAttempt(attempt + 1)}>Try again</Button><Link className="text-link" to="/">Back to Love Lab</Link></div></Page>;
+  if (previewError) return <Page eyebrow="Partner invitation" title="Let’s find your invitation."><Notice>{previewError}</Notice><div className="actions"><Button onClick={() => setAttempt(attempt + 1)}>Try again</Button><Link className="text-link" to="/">Back to Kintsugi</Link></div></Page>;
   if (!preview) return <Loading label="Opening your invitation…" />;
   return <>
     <div className="invite-intro"><span className="invite-icon"><HeartHandshake size={26} aria-hidden="true" /></span><div><p className="eyebrow">An invitation to understand each other</p><p>{preview.message}</p></div><span className="invite-private"><LockKeyhole size={15} aria-hidden="true" />Your own perspective</span></div>
@@ -284,8 +352,16 @@ export function InvitePage() {
         throw err;
       }
       if (signal.aborted) return;
-      await refresh();
-      navigate('/choose', { replace: true });
+      const current = await refresh();
+      if (signal.aborted) return;
+      if (current?.currentSessionId) { navigate(`/fight-sessions/${current.currentSessionId}`, { replace: true }); return; }
+      try {
+        const fight = await api<Fight>('/fight-sessions', {}, { signal });
+        await refresh();
+        if (!signal.aborted) navigate(`/fight-sessions/${fight.sessionId}`, { replace: true });
+      } catch {
+        if (!signal.aborted) navigate('/choose', { replace: true });
+      }
     }); }} />
   </>;
 }

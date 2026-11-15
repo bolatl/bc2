@@ -100,8 +100,12 @@ func Load() (Config, error) {
 	if c.MaxTurns < minTurns || c.MaxTurns > 12 {
 		return c, fmt.Errorf("MAX_TURNS must be %d..12", minTurns)
 	}
-	if c.FreeTurns < 3 || c.FreeTurns > 4 {
-		return c, fmt.Errorf("FREE_TURNS must be 3 or 4")
+	maxFreeTurns := 4
+	if c.Funnel == "full" {
+		maxFreeTurns = 5
+	}
+	if c.FreeTurns < 3 || c.FreeTurns > maxFreeTurns {
+		return c, fmt.Errorf("FREE_TURNS must be 3..%d for the %s funnel", maxFreeTurns, c.Funnel)
 	}
 	if c.DivergenceThreshold < 1 || c.DivergenceThreshold > 9 {
 		return c, fmt.Errorf("DIVERGENCE_THRESHOLD must be 1..9")

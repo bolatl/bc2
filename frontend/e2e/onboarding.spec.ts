@@ -1,35 +1,75 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { answerCurrent, capturePrototype, fightState, openPlanFromInsight } from './flow-helpers';
+import { completeDemoCheckout } from './checkout-helpers';
 
 const apiOrigin = 'http://localhost:18080';
 const canonicalQuestions = [...readFileSync(new URL('../../docs/features/backend-mvp/FRONTEND_CONTRACT.md', import.meta.url), 'utf8').matchAll(/^\d+\. (.+)$/gm)].map((match) => match[1]);
 const accuracyLabels = ['Very inaccurate', 'Moderately inaccurate', 'Neither inaccurate nor accurate', 'Moderately accurate', 'Very accurate'];
 
-test('onboarding requires a choice and limits topics to three distinct values', async ({ page }) => {
-  await page.goto('/onboarding');
-  await expect(page.getByRole('heading', { name: 'How old are you?' })).toBeVisible();
+test('four short onboarding steps lead through the complete prototype flow and save the edited rehearsal', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Rehearse the first sentence before you say it.', exact: true })).toBeVisible();
+  await expect(page).toHaveTitle(/Kintsugi/);
+  await page.getByRole('link', { name: 'We’re engaged. Prepare us', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Who’s this about?', exact: true })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Engaged', exact: true })).toBeChecked();
   await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
-
-  for (const answer of ['25–29', 'Dating', '1–3 years', 'No', 'Need some space', 'Feeling heard']) {
-    await page.getByRole('radio', { name: answer, exact: true }).check();
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  }
-
-  await expect(page.getByRole('heading', { name: 'What tends to come between you?' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
-  for (const topic of ['Money', 'Housework', 'Family']) await page.getByRole('checkbox', { name: topic, exact: true }).check();
-  await expect(page.getByRole('checkbox', { name: 'Phones', exact: true })).toBeDisabled();
-  await page.getByRole('checkbox', { name: 'Money', exact: true }).uncheck();
-  await page.getByRole('checkbox', { name: 'Phones', exact: true }).check();
+  await page.getByLabel('Your partner’s first name', { exact: true }).fill('Sam');
+  await capturePrototype(page, 'onboarding');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-
-  await expect(page.getByRole('button', { name: 'Save and continue' })).toBeDisabled();
-  await page.getByRole('radio', { name: 'Understanding each other', exact: true }).check();
-  const request = page.waitForRequest((req) => req.url() === `${apiOrigin}/api/v1/couples` && req.method() === 'POST');
-  await page.getByRole('button', { name: 'Save and continue' }).click();
-  expect((await request).postDataJSON()).toEqual({ age: '25-29', relationshipStatus: 'dating', togetherDuration: '1-3', hasKids: 'no', conflictStyle: 'need_space', repairNeed: 'being_heard', fightTopics: ['chores', 'family', 'phone'], goal: 'understand_each_other' });
-  await expect(page).toHaveURL(/\/choose$/);
-  await expect(page.getByRole('heading', { name: 'Where would you like to start?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'In a fight, you usually…', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Go quiet', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'After a fight, what helps you most?', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Go quiet', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Try to fix it fast', exact: true }).click();
+  await page.getByRole('button', { name: 'Talking it out', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'How did you find us?', exact: true })).toBeVisible();
+  const request = page.waitForRequest(req => req.url() === `${apiOrigin}/api/v1/couples` && req.method() === 'POST');
+  await page.getByRole('button', { name: 'A friend', exact: true }).click();
+  expect((await request).postDataJSON()).toEqual({ partnerName: 'Sam', relationshipStatus: 'engaged', conflictStyle: 'talk_now', repairNeed: 'being_heard', source: 'friend' });
+  await expect(page).toHaveURL(/\/fight-sessions\/[^/]+$/);
+  const id = page.url().split('/').pop()!;
+  const api = `${apiOrigin}/api/v1`;
+  await expect(page.getByRole('slider', { name: 'Upset level, 1 to 10' })).toBeVisible();
+  await capturePrototype(page, 'thermometer');
+  await answerCurrent(page, api, id, undefined, 8);
+  await expect(page.getByLabel('Your story', { exact: true })).toBeEmpty();
+  await page.getByRole('button', { name: 'We had friends over. I cleaned up alone afterward.', exact: true }).click();
+  await expect(page.getByLabel('Your story', { exact: true })).toHaveValue('We had friends over. I cleaned up alone afterward.');
+  await answerCurrent(page, api, id, 'I cleaned up alone after our friends left and wanted some help.');
+  for (const stage of ['feelings', 'needs', 'partner_view']) {
+    expect((await fightState(page, api, id)).stage).toBe(stage);
+    await answerCurrent(page, api, id);
+  }
+  await expect(page).toHaveURL(new RegExp(`/fight-sessions/${id}/insight$`));
+  await expect(page.getByRole('heading', { name: 'You feel', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/prototype-insight.png', fullPage: true, animations: 'disabled' });
+  await openPlanFromInsight(page, id, true);
+  await expect(page.locator('input[name="plan"]:checked')).toHaveValue('program');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await completeDemoCheckout(page);
+  expect((await fightState(page, api, id)).stage).toBe('rehearsal');
+  for (const route of ['insight', 'rehearsal']) {
+    await page.goto(`/fight-sessions/${id}/${route}`);
+    await expect(page).toHaveURL(new RegExp(`/fight-sessions/${id}$`));
+    await expect(page.getByRole('heading', { name: 'Choose your first sentence.', exact: true })).toBeVisible();
+  }
+  const opening = 'I felt alone cleaning up. Could we agree on a plan for next time?';
+  await answerCurrent(page, api, id, opening);
+  await answerCurrent(page, api, id, undefined, 5);
+  await answerCurrent(page, api, id);
+  await expect(page).toHaveURL(new RegExp(`/fight-sessions/${id}/result$`));
+  await expect(page.getByRole('heading', { name: 'Your plan for the talk.', exact: true })).toBeVisible();
+  await expect(page.locator('.summary-line')).toContainText(opening);
+  await expect(page.locator('.thermometer-result')).toContainText('8');
+  await expect(page.locator('.thermometer-result')).toContainText('5');
+  await page.reload();
+  await expect(page.locator('.summary-line')).toContainText(opening);
+  const result = await (await page.request.get(`${api}/fight-sessions/${id}/result`)).json();
+  expect(result.openingLine).toBe(opening);
+  await page.screenshot({ path: 'test-results/prototype-ready.png', fullPage: true, animations: 'disabled' });
 });
 
 test('Mini-IPIP presents canonical order, submits original scores, and shows the real report', async ({ page }) => {

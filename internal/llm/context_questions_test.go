@@ -47,7 +47,7 @@ func TestContextualMockQuestionsRespectLengths(t *testing.T) {
 func TestHostedQuestionGetsOwnedContextAndSource(t *testing.T) {
 	var seen map[string]any
 	client := fakeOpenAI(t, `{"agentQuestion":"What felt hardest about the dishes?","optionLeft":"Carrying the work alone","optionRight":"Feeling my effort was unseen"}`, 200, &seen)
-	input := Input{Stage: "feelings", Profile: Profile{ConflictStyle: "need_space", TraitLevels: map[string]string{"a": "high"}}, Turns: []Turn{{
+	input := Input{Stage: "feelings", Profile: Profile{PartnerName: "Sam", ConflictStyle: "need_space", TraitLevels: map[string]string{"a": "high"}}, Turns: []Turn{{
 		Stage: "facts", Question: "What happened?", AnswerSource: "free_text", AnswerText: "I washed the dishes after dinner alone.",
 	}}}
 	if _, err := client.NextTurn(context.Background(), input); err != nil {
@@ -55,7 +55,7 @@ func TestHostedQuestionGetsOwnedContextAndSource(t *testing.T) {
 	}
 	messages := seen["messages"].([]any)
 	message := messages[1].(map[string]any)["content"].(string)
-	for _, required := range []string{"Prioritize free_text", "concrete detail", "What happened?", "I washed the dishes after dinner alone.", `"answerSource":"free_text"`, `"traitLevels":{"a":"high"}`} {
+	for _, required := range []string{"Prioritize free_text", "concrete detail", "What happened?", "I washed the dishes after dinner alone.", `"answerSource":"free_text"`, `"traitLevels":{"a":"high"}`, `"partnerName":"Sam"`} {
 		if !strings.Contains(message, required) {
 			t.Errorf("missing %q in hosted context", required)
 		}

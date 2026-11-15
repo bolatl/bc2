@@ -13,7 +13,7 @@ func fixture(t *testing.T) (*Handler, string) {
 	t.Helper()
 	dir := t.TempDir()
 	for name, content := range map[string]string{
-		"index.html":              "<!doctype html><title>Love Lab</title>",
+		"index.html":              "<!doctype html><title>Kintsugi</title>",
 		"assets/app-aB123456.js":  "console.log('build');",
 		"assets/app-aB123456.css": "body { color: white; }",
 		"fonts/body.woff2":        "font-fixture",
@@ -51,7 +51,7 @@ func TestSPADeepLinksAndStaticCachePolicies(t *testing.T) {
 	h, _ := fixture(t)
 	for _, path := range []string{"/", "/index.html", "/onboarding", "/fight-sessions/example/result", "/checkout/success?session_id=fixture"} {
 		w := request(h, "GET", path)
-		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "<title>Love Lab</title>") || w.Header().Get("Cache-Control") != "no-store" {
+		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "<title>Kintsugi</title>") || w.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("deep link failed at %s: status=%d", path, w.Code)
 		}
 	}

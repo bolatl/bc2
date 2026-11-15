@@ -53,6 +53,26 @@ func TestDevelopmentDefaultsRemainUsable(t *testing.T) {
 	}
 }
 
+func TestPrototypeFunnelConfiguration(t *testing.T) {
+	productionEnvironment(t)
+	t.Setenv("FUNNEL", "full")
+	t.Setenv("FREE_TURNS", "5")
+	t.Setenv("ENABLE_REHEARSAL", "true")
+	cfg, err := Load()
+	if err != nil || cfg.Funnel != "full" || cfg.FreeTurns != 5 || !cfg.EnableRehearsal {
+		t.Fatalf("prototype deployment settings rejected: %+v, %v", cfg, err)
+	}
+	t.Setenv("FREE_TURNS", "6")
+	if _, err := Load(); err == nil {
+		t.Fatal("free preparation allowed past the contextual questions")
+	}
+	t.Setenv("FREE_TURNS", "5")
+	t.Setenv("FUNNEL", "short")
+	if _, err := Load(); err == nil {
+		t.Fatal("short funnel accepted five free turns")
+	}
+}
+
 func TestProductionRejectsUnsafeDeploymentSettings(t *testing.T) {
 	for _, test := range []struct {
 		key, value, message string

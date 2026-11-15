@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Love Lab Backend MVP
+  title: Kintsugi Backend MVP
   version: 1.0.0
   description: Anonymous two-partner conversation practice. Backend prompt is the primary requirement source. No real payment
     collection in this MVP.
@@ -1312,15 +1312,19 @@ components:
       type: object
       additionalProperties: false
       required:
-      - age
       - relationshipStatus
-      - togetherDuration
-      - hasKids
       - conflictStyle
       - repairNeed
-      - fightTopics
-      - goal
       properties:
+        partnerName:
+          type: string
+          minLength: 1
+          maxLength: 20
+          description: Optional partner first name supplied by this person; visible only in their own profile context.
+        source:
+          type: string
+          enum: [instagram_facebook, tiktok, google, partner_link, friend, other]
+          description: Optional self-reported discovery source.
         age:
           $ref: '#/components/schemas/Age'
         relationshipStatus:
@@ -1347,7 +1351,6 @@ components:
       type: object
       additionalProperties: false
       required:
-      - age
       - conflictStyle
       - repairNeed
       properties:
@@ -1393,6 +1396,10 @@ components:
         coupleId: *id001
         partnerRole:
           $ref: '#/components/schemas/PartnerRole'
+        partnerName:
+          type: string
+          maxLength: 20
+          description: Partner name provided by this caller during onboarding. Omitted if unknown; never copied from the other partner's private profile.
         currentSessionId:
           type:
           - string
@@ -1592,13 +1599,15 @@ components:
           minimum: 0
         agentQuestion:
           type: string
-          description: Question for the owner of this session.
+          description: One short contextual question for the owner of this session, at most twelve words.
         optionLeft:
           type: string
-          description: First answer card.
+          maxLength: 60
+          description: First answer card, at most eight words.
         optionRight:
           type: string
-          description: Second answer card.
+          maxLength: 60
+          description: Second answer card, at most eight words.
         progressStageIndex:
           type:
           - integer
@@ -1915,7 +1924,19 @@ components:
           description: Private derived need summary.
         openingLine:
           type: string
-          description: Private first sentence; empty while locked.
+          description: Private first sentence; empty while locked. Preserves the caller's chosen or edited rehearsal line when respectful, up to 300 characters.
+        rehearsal:
+          type: object
+          additionalProperties: false
+          required: [optionA, optionB]
+          description: The caller's current generated opening-line options, available before payment when the next stage is rehearsal. Contains no predictions or private partner answers. Omitted at other stages.
+          properties:
+            optionA:
+              type: string
+              maxLength: 60
+            optionB:
+              type: string
+              maxLength: 60
         sharedRules:
           type: array
           items:

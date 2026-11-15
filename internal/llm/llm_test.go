@@ -16,8 +16,8 @@ func TestMockQuestionsStayInContract(t *testing.T) {
 		if question.AgentQuestion == "" || question.OptionLeft == "" || question.OptionRight == "" || question.OptionLeft == question.OptionRight {
 			t.Fatalf("invalid question: %+v", question)
 		}
-		if len(strings.Fields(question.OptionLeft)) > 12 || len(strings.Fields(question.OptionRight)) > 12 {
-			t.Fatalf("cards too long: %+v", question)
+		if problem := questionProblem(question); problem != "" {
+			t.Fatalf("invalid question (%s): %+v", problem, question)
 		}
 		assertLanguage(t, question.AgentQuestion+question.OptionLeft+question.OptionRight)
 	}

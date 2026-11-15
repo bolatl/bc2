@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, LockKeyhole } from 'lucide-react';
 export { ArrowRight };
 
@@ -46,9 +46,13 @@ export function Loading({ label = 'Loading…' }: { label?: string }) {
   return <div className="loading" role="status"><span className="loading-mark" aria-hidden="true"><i /><i /></span><span>{label}</span></div>;
 }
 export function Scale({ value, onChange, disabled = false, tone = 'intensity' }: { value: number | null; onChange: (value: number) => void; disabled?: boolean; tone?: 'intensity' | 'rating' }) {
-  const name = useId();
-  return <fieldset className={`scale-field scale-${tone}`} disabled={disabled}><legend className="sr-only">Choose a number from 1 to 10</legend><div className="scale">{Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
-    const band = tone === 'rating' ? n >= 8 ? 'good' : n >= 5 ? 'mid' : 'bad' : n <= 3 ? 'good' : n <= 6 ? 'mid' : 'bad';
-    return <label key={n} className={`scale-option scale-${band} ${value === n ? 'selected' : ''}`}><input type="radio" name={name} value={n} checked={value === n} onChange={() => onChange(n)} /><span>{n}</span></label>;
-  })}</div></fieldset>;
+  const id = useId();
+  const selected = value ?? 6;
+  return <div className={`range-scale range-${tone}`}>
+    {tone === 'rating' && <output className="range-rating-value" htmlFor={id}>{value ?? '—'}</output>}
+    <input id={id} type="range" min={1} max={10} step={1} value={selected} disabled={disabled}
+      aria-label={tone === 'rating' ? 'Conversation rating, 1 to 10' : 'Upset level, 1 to 10'}
+      style={{ '--range-fill': `${(selected - 1) / 9 * 100}%` } as CSSProperties}
+      onChange={event => onChange(Number(event.target.value))} />
+  </div>;
 }

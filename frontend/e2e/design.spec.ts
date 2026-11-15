@@ -1,4 +1,6 @@
+import { answerCurrent } from './flow-helpers';
 import { expect, test, type Page } from '@playwright/test';
+import { completeDemoCheckout } from './checkout-helpers';
 import type { Checkout, Couple, Fight } from '../src/api/types';
 
 const API = 'http://localhost:18080/api/v1';
@@ -32,28 +34,13 @@ async function capture(page: Page, name: string) {
 
 async function start(page: Page) {
   await page.goto('/choose');
-  await page.getByRole('button', { name: /Talk to Love Lab now/ }).click();
+  await page.getByRole('button', { name: /Talk to Kintsugi now/ }).click();
   await expect(page).toHaveURL(/\/fight-sessions\/[^/]+$/);
   return page.url().split('/').pop()!;
 }
 
 async function answer(page: Page, id: string, text?: string) {
-  const { currentTurn: current } = await get<Fight>(page, `/fight-sessions/${id}`);
-  if (current?.type !== 'next_turn') throw new Error(`Expected a question, got ${current?.type}`);
-  await expect(page.getByRole('heading', { name: current.agentQuestion, exact: true })).toBeVisible();
-  if (current.stage.startsWith('thermometer')) {
-    await page.getByRole('radio', { name: '6', exact: true }).check();
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  } else if (text !== undefined) {
-    await page.getByLabel('Or put it in your own words').fill(text);
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  } else {
-    await page.getByRole('button', { name: current.optionLeft, exact: true }).click();
-  }
-  await expect.poll(async () => {
-    const next = (await get<Fight>(page, `/fight-sessions/${id}`)).currentTurn;
-    return next?.type !== 'next_turn' || next.turnIndex !== current.turnIndex;
-  }).toBeTruthy();
+  await answerCurrent(page, API, id, text);
 }
 
 async function activatePlan(page: Page) {
@@ -63,7 +50,7 @@ async function activatePlan(page: Page) {
 
 async function completePreparation(page: Page, sentinel: string) {
   const { sessionId } = await post<Fight>(page, '/fight-sessions', {});
-  for (let index = 0; index < 8; index++) {
+  for (let index = 0; index < 12; index++) {
     const state = await get<Fight>(page, `/fight-sessions/${sessionId}`);
     if (state.status === 'completed') return sessionId;
     const current = state.currentTurn;
@@ -179,9 +166,10 @@ test('subscription previews stay blurred and inactive until a real mock checkout
     await preview.locator('a[href="/paywall"]').click();
     await expect(page).toHaveURL(/\/paywall$/);
   }
-  await expect(page.locator('.locked-preview-guide')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Start the talk with a sentence that works.' })).toBeVisible();
   await capture(page, 'paywall');
-  await page.getByRole('button', { name: 'Continue to checkout', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await completeDemoCheckout(page);
   await expect(page).toHaveURL(/\/home$/);
   const updated = await get<Couple>(page, '/couples/me');
   expect(updated.subscription?.status).toBe('active');

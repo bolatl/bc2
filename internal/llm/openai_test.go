@@ -77,9 +77,10 @@ func TestOpenAIRejectsBadOutput(t *testing.T) {
 func TestVerboseOrProhibitedOutputIsRetriedThenReplacedByTemplate(t *testing.T) {
 	long := strings.Repeat("word ", MaxQuestionWords+1)
 	for name, content := range map[string]string{
-		"long question": `{"agentQuestion":"` + long + `","optionLeft":"A","optionRight":"B"}`,
-		"long card":     `{"agentQuestion":"Short?","optionLeft":"` + strings.Repeat("w ", MaxCardWords+1) + `","optionRight":"B"}`,
-		"prohibited":    `{"agentQuestion":"See a therapist?","optionLeft":"A","optionRight":"B"}`,
+		"long question":     `{"agentQuestion":"` + long + `","optionLeft":"A","optionRight":"B"}`,
+		"long card":         `{"agentQuestion":"Short?","optionLeft":"` + strings.Repeat("w ", MaxCardWords+1) + `","optionRight":"B"}`,
+		"long unicode card": `{"agentQuestion":"Short?","optionLeft":"` + strings.Repeat("я", MaxCardChars+1) + `","optionRight":"B"}`,
+		"prohibited":        `{"agentQuestion":"See a therapist?","optionLeft":"A","optionRight":"B"}`,
 	} {
 		calls := 0
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -1,4 +1,6 @@
+import { answerCurrent, finishPreparation, openPlanFromInsight } from './flow-helpers';
 import { expect, test, type Page } from '@playwright/test';
+import { completeDemoCheckout } from './checkout-helpers';
 import type { Fight, Result } from '../src/api/types';
 
 const API = 'http://localhost:18080/api/v1';
@@ -13,28 +15,13 @@ async function get<T>(page: Page, path: string): Promise<T> {
 async function create(page: Page) {
   expect((await page.request.post(`${API}/couples`, { data: profile })).status()).toBe(201);
   await page.goto('/choose');
-  await page.getByRole('button', { name: /Talk to Love Lab now/ }).click();
+  await page.getByRole('button', { name: /Talk to Kintsugi now/ }).click();
   await expect(page).toHaveURL(/\/fight-sessions\/[^/]+$/);
   return page.url().split('/').pop()!;
 }
 
 async function answer(page: Page, id: string, text?: string) {
-  const { currentTurn: turn } = await get<Fight>(page, `/fight-sessions/${id}`);
-  if (turn?.type !== 'next_turn') throw new Error(`Expected a question, got ${turn?.type}`);
-  await expect(page.getByRole('heading', { name: turn.agentQuestion, exact: true })).toBeVisible();
-  if (turn.stage.startsWith('thermometer')) {
-    await page.getByRole('radio', { name: '6', exact: true }).check();
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  } else if (text !== undefined) {
-    await page.getByLabel('Or put it in your own words').fill(text);
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  } else {
-    await page.getByRole('button', { name: turn.optionLeft, exact: true }).click();
-  }
-  await expect.poll(async () => {
-    const next = (await get<Fight>(page, `/fight-sessions/${id}`)).currentTurn;
-    return next?.type !== 'next_turn' || next.turnIndex !== turn.turnIndex;
-  }).toBeTruthy();
+  await answerCurrent(page, API, id, text);
 }
 
 async function capture(page: Page, name: string) {
@@ -62,7 +49,9 @@ test('typed context shapes questions; free explanations unlock practical steps a
   if (needs?.type !== 'next_turn') throw new Error('Expected needs question');
   expect(needs.agentQuestion).toMatch(/heard/i);
   await answer(page, id, 'I needed a clear plan for sharing the chores and time to finish what I was saying.');
-  await expect(page).toHaveURL(url => url.pathname === '/paywall' && url.searchParams.get('sessionId') === id);
+  await answer(page, id);
+  await expect(page).toHaveURL(new RegExp(`/fight-sessions/${id}/insight$`));
+  await page.getByText('Explore your strengths and patterns', { exact: true }).click();
 
   const preview = await get<Result>(page, `/fight-sessions/${id}/result`);
   const reflection = preview.reflection;
@@ -83,10 +72,7 @@ test('typed context shapes questions; free explanations unlock practical steps a
   await expect(report.locator('.reflection-detail-skeleton')).toHaveAttribute('inert', '');
   await expect(report.locator('.reflection-detail-skeleton')).toHaveAttribute('aria-hidden', 'true');
   await expect(report.locator('.reflection-detail-skeleton')).toHaveCSS('filter', 'blur(5px)');
-  await expect(page.locator('.paywall-workspace > *')).toHaveCount(2);
-  await expect(page.locator('.paywall-workspace > .plan-picker')).toHaveCount(1);
-  await expect(page.locator('.paywall-reflection-column > *')).toHaveCount(1);
-  await capture(page, 'paywall');
+  await capture(page, 'insight');
 
   const outsider = await browser.newContext();
   try {
@@ -101,13 +87,16 @@ test('typed context shapes questions; free explanations unlock practical steps a
     expect(money.agentQuestion).not.toBe(feelings.agentQuestion);
   } finally { await outsider.close(); }
 
-  await page.getByRole('button', { name: 'Continue to checkout', exact: true }).click();
+  await openPlanFromInsight(page, id);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await completeDemoCheckout(page);
   await expect(page).toHaveURL(new RegExp(`/fight-sessions/${id}$`));
-  for (let index = 0; index < 3; index++) await answer(page, id);
+  await finishPreparation(page, API, id);
   await expect(page).toHaveURL(new RegExp(`/fight-sessions/${id}/result$`));
   const unlocked = await get<Result>(page, `/fight-sessions/${id}/result`);
   expect(unlocked.reflection).toBeTruthy();
   if (!unlocked.reflection) throw new Error('Expected unlocked reflection');
+  await page.getByText('Explore your personal reflection', { exact: true }).click();
   const fullReport = page.locator('.conversation-reflection');
   await expect(fullReport.locator('.reflection-detail-skeleton')).toHaveCount(0);
   for (const facet of unlocked.reflection.facets) {

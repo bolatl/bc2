@@ -399,7 +399,11 @@ func (a *App) resultView(actor model.Actor, c model.Couple, f model.FightSession
 	if record, ok := a.Journal.Get(f.RoundID); ok && record.CoupleID == c.ID && record.BothReadyAt != nil {
 		recordID = cp(&record.ID)
 	}
-	return dto.FightSessionResultResponse{SessionID: f.ID, FightRecordID: recordID, NeutralTopic: f.NeutralTopic, FeltText: f.Result.FeltText, NeedText: f.Result.NeedText, OpeningLine: opening, SharedRules: append([]string{}, f.Result.SharedRules...), PartnerStatus: partnerStatus, ThermometerStart: cp(f.ThermometerStart), ThermometerEnd: cp(f.ThermometerEnd), Tier: f.Tier, Locked: locked, Reflection: reflectionView(f.Result.Reflection, a.active(c.ID))}, nil
+	var rehearsal *dto.RehearsalOptions
+	if f.Current != nil && f.Current.Stage == "rehearsal" {
+		rehearsal = &dto.RehearsalOptions{OptionA: f.Current.OptionLeft, OptionB: f.Current.OptionRight}
+	}
+	return dto.FightSessionResultResponse{SessionID: f.ID, FightRecordID: recordID, NeutralTopic: f.NeutralTopic, FeltText: f.Result.FeltText, NeedText: f.Result.NeedText, OpeningLine: opening, SharedRules: append([]string{}, f.Result.SharedRules...), PartnerStatus: partnerStatus, ThermometerStart: cp(f.ThermometerStart), ThermometerEnd: cp(f.ThermometerEnd), Tier: f.Tier, Locked: locked, Reflection: reflectionView(f.Result.Reflection, a.active(c.ID)), Rehearsal: rehearsal}, nil
 }
 
 func (a *App) ownedFight(actor model.Actor, id string) (model.Couple, model.FightSession, error) {
@@ -544,7 +548,7 @@ func (a *App) fightInput(c model.Couple, f model.FightSession) (llm.Input, error
 	if f.PartnerRole == "B" && c.ProfileB != nil {
 		profile = *c.ProfileB
 	}
-	texts := []string{profile.ConflictStyle, profile.RepairNeed, profile.Goal, f.NeutralTopic}
+	texts := []string{profile.PartnerName, profile.ConflictStyle, profile.RepairNeed, profile.Goal, f.NeutralTopic}
 	turns := make([]llm.Turn, 0, len(f.Turns))
 	for _, turn := range f.Turns {
 		texts = append(texts, turn.AnswerText)
@@ -557,7 +561,7 @@ func (a *App) fightInput(c model.Couple, f model.FightSession) (llm.Input, error
 	if p, ok := a.Personalities.Get(personalityKey(model.Actor{CoupleID: c.ID, PartnerRole: f.PartnerRole})); ok {
 		levels = map[string]string{"e": p.Traits.E.Level, "a": p.Traits.A.Level, "c": p.Traits.C.Level, "n": p.Traits.N.Level, "i": p.Traits.I.Level}
 	}
-	return llm.Input{Stage: f.Stage, NeutralTopic: f.NeutralTopic, Profile: llm.Profile{ConflictStyle: profile.ConflictStyle, RepairNeed: profile.RepairNeed, Goal: profile.Goal, FightTopics: append([]string{}, profile.FightTopics...), TraitLevels: levels}, Turns: turns}, nil
+	return llm.Input{Stage: f.Stage, NeutralTopic: f.NeutralTopic, Profile: llm.Profile{PartnerName: profile.PartnerName, ConflictStyle: profile.ConflictStyle, RepairNeed: profile.RepairNeed, Goal: profile.Goal, FightTopics: append([]string{}, profile.FightTopics...), TraitLevels: levels}, Turns: turns}, nil
 }
 func (a *App) nextQuestion(ctx context.Context, c model.Couple, f *model.FightSession) error {
 	input, err := a.fightInput(c, *f)
@@ -571,8 +575,8 @@ func (a *App) nextQuestion(ctx context.Context, c model.Couple, f *model.FightSe
 	if strings.TrimSpace(question.AgentQuestion) == "" || strings.TrimSpace(question.OptionLeft) == "" || strings.TrimSpace(question.OptionRight) == "" {
 		return errors.New("incomplete generated question")
 	}
-	if strings.EqualFold(strings.TrimSpace(question.OptionLeft), strings.TrimSpace(question.OptionRight)) || len(strings.Fields(question.OptionLeft)) > 12 || len(strings.Fields(question.OptionRight)) > 12 {
-		return errors.New("generated cards must be distinct and contain at most twelve words")
+	if strings.EqualFold(strings.TrimSpace(question.OptionLeft), strings.TrimSpace(question.OptionRight)) || len(strings.Fields(question.OptionLeft)) > llm.MaxCardWords || len(strings.Fields(question.OptionRight)) > llm.MaxCardWords || utf8.RuneCountInString(question.OptionLeft) > llm.MaxCardChars || utf8.RuneCountInString(question.OptionRight) > llm.MaxCardChars {
+		return errors.New("generated cards must be distinct and contain at most eight words and sixty characters")
 	}
 	f.Current = &model.FightTurn{TurnIndex: len(f.Turns), Stage: f.Stage, AgentQuestion: question.AgentQuestion, OptionLeft: question.OptionLeft, OptionRight: question.OptionRight}
 	return nil
@@ -602,6 +606,18 @@ func (a *App) resultFromInput(ctx context.Context, input llm.Input) (*model.Figh
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	// A chosen rehearsal is an intentional saved output. Preserve that wording
+	// instead of replacing it with a newly generated line in the final summary.
+	// Crude or unsafe wording continues through the model's neutral paraphrase.
+	for i := len(input.Turns) - 1; i >= 0; i-- {
+		turn := input.Turns[i]
+		if turn.Stage == "rehearsal" && strings.TrimSpace(turn.AnswerText) != "" {
+			if llm.RespectfulText(turn.AnswerText) && !safety.Check(turn.AnswerText) {
+				result.OpeningLine = strings.TrimSpace(turn.AnswerText)
+			}
+			break
+		}
 	}
 	return &model.FightResult{FeltText: result.FeltText, NeedText: result.NeedText, OpeningLine: result.OpeningLine, SharedRules: append([]string{}, result.SharedRules...)}, nil
 }

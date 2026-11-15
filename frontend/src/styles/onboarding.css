@@ -169,3 +169,45 @@
 @media (prefers-reduced-motion: reduce) {
   .choose-card, .wizard-progress > span { transition: none; }
 }
+
+/* Prototype flow: one compact prompt, a short stack of answers, then onward. */
+.welcome-entry-actions { flex-direction: column; align-items: stretch; max-width: 360px; gap: 12px; }
+.welcome-entry-actions .button { justify-content: space-between; min-height: 53px; }
+.initial-profile-page { max-width: 710px; margin-inline: auto; }
+.initial-profile-page > .page-content { display: flex; flex-direction: column; padding: clamp(24px, 4vw, 44px); border: 1px solid var(--rule); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: var(--shadow-soft); }
+.initial-profile-page .page-heading { margin-bottom: 28px; }
+.initial-profile-page .page-heading h1 { font-size: clamp(30px, 3.5vw, 42px); }
+.initial-profile-page .page-heading .lead { font-size: 14px; }
+.initial-profile-topbar { order: -1; display: flex; align-items: center; gap: 17px; margin-bottom: 28px; }
+.initial-profile-back { width: 40px; height: 40px; min-height: 40px; display: inline-grid; place-items: center; padding: 0; flex-shrink: 0; border-radius: 50%; color: var(--ink-muted); background: var(--soft); }
+.initial-profile-topbar .wizard-progress { margin-bottom: 0; flex: 1; }
+.initial-profile-count { font-size: 12px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.initial-profile-name { display: grid; gap: 12px; font-size: 14px; font-weight: 500; }
+.initial-profile-name input { width: 100%; min-height: 56px; border: 1px solid var(--control-border); border-radius: var(--radius-md); color: var(--ink); background: var(--bg); padding: 14px 17px; font-size: 17px; }
+.initial-profile-name input::placeholder { color: var(--ink-muted); opacity: .8; }
+.initial-profile-page .initial-profile-name-help { margin-top: -12px; font-size: 12px; }
+.initial-relationship { margin-top: 8px; }
+.initial-relationship legend { font-size: 14px; font-weight: 500; padding: 0 0 12px; }
+.initial-relationship-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.initial-relationship-chip { min-height: 49px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--rule); background: var(--bg); border-radius: 99px; padding: 10px 12px; cursor: pointer; font-size: 14px; }
+.initial-relationship-chip.selected { color: var(--you-ink); background: var(--you-soft); border-color: var(--you); }
+.initial-relationship-chip:focus-within { outline: 3px solid var(--partner); outline-offset: 3px; }
+.initial-profile-continue { margin-top: 14px; width: 100%; }
+.initial-profile-choices { display: grid; gap: 12px; }
+.initial-profile-option { width: 100%; min-height: 64px; padding: 18px 20px; gap: 14px; font-size: 16px; }
+.initial-profile-option:disabled { opacity: 1; }
+.initial-profile-option.selected { border-color: var(--you); background: var(--you-soft); box-shadow: none; }
+.initial-profile-dot { display: inline-grid; place-items: center; width: 19px; height: 19px; border: 1px solid var(--control-border); border-radius: 50%; flex-shrink: 0; }
+.initial-profile-option.selected .initial-profile-dot { color: var(--on-accent); background: var(--you); border-color: var(--you); }
+.initial-profile-option-arrow { margin-left: auto; color: var(--ink-muted); opacity: 0; }
+.initial-profile-option:hover .initial-profile-option-arrow, .initial-profile-option:focus-visible .initial-profile-option-arrow, .initial-profile-option.selected .initial-profile-option-arrow { opacity: 1; }
+.initial-profile-status { min-height: 20px; color: var(--ink-muted); font-size: 12px; }
+.initial-profile-page .wizard-privacy { padding-top: 2px; }
+.wizard-partner .option-grid { grid-template-columns: 1fr; }
+@media (max-width: 767px) {
+  .initial-profile-page > .page-content { padding: 25px 22px; }
+  .initial-profile-topbar { margin-bottom: 23px; gap: 12px; }
+  .initial-profile-option { min-height: 62px; padding: 16px; font-size: 15px; }
+  .initial-relationship-options { gap: 7px; }
+  .initial-relationship-chip { padding-inline: 7px; font-size: 13px; }
+}

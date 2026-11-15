@@ -1,0 +1,70 @@
+.demo-checkout-page { max-width: 1056px; margin-inline: auto; }
+.demo-checkout-page .page-heading { max-width: 750px; }
+.demo-checkout-underlay { max-width: 660px; margin-inline: auto; }
+.demo-order-summary, .demo-payment-panel { border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: clamp(24px, 3vw, 38px); }
+.demo-order-summary { background: linear-gradient(145deg, color-mix(in srgb, var(--you-soft) 55%, var(--surface)), var(--surface) 70%); }
+.demo-summary-icon, .demo-success-icon { display: inline-grid; place-items: center; background: var(--you-soft); color: var(--you-ink); border-radius: 50%; width: 60px; height: 60px; margin-bottom: 28px; }
+.demo-order-summary .eyebrow { color: var(--you-ink); margin-bottom: 9px; }
+.demo-order-summary h2 { font-size: 31px; margin-bottom: 20px; }
+.demo-plan-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px; font-family: var(--font-display); font-size: 42px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.demo-plan-price span { font: 13px var(--font-ui); color: var(--ink-muted); }
+.demo-plan-description { color: var(--ink-muted); font-size: 13px; margin: 13px 0 25px; }
+.demo-couple-note { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--you-ink); padding-block: 19px; border-block: 1px solid var(--rule); }
+.demo-plan-benefits { list-style: none; margin: 24px 0 30px; padding: 0; display: grid; gap: 15px; font-size: 13px; }
+.demo-plan-benefits li { display: flex; align-items: flex-start; gap: 12px; }
+.demo-plan-benefits svg { margin-top: 2px; color: var(--partner); }
+.demo-charge { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--rule); padding-top: 23px; font-size: 14px; }
+.demo-charge strong { font-size: 23px; font-weight: 600; }
+.demo-charge-note { font-size: 12px; line-height: 1.7; color: var(--ink-muted); margin: 9px 0 0; }
+.demo-payment-panel { width: min(520px, calc(100% - 40px)); max-height: calc(100dvh - 48px); margin: auto; color: var(--ink); background: var(--surface); box-shadow: 0 24px 100px rgb(8 17 34 / .4); overflow: auto; overscroll-behavior: contain; }
+.demo-payment-panel::backdrop { background: rgb(8 17 34 / .68); backdrop-filter: blur(3px); }
+.demo-sheet-handle { display: none; width: 64px; height: 5px; margin: 0 auto 22px; border-radius: 5px; background: var(--rule); }
+.demo-checkout-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--ink-muted); font-size: 14px; margin-bottom: 24px; }
+.demo-checkout-line strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.demo-payment-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+.demo-payment-heading h2 { margin: 0; font-size: 27px; }
+.demo-payment-heading h2:focus { outline: none; }
+.demo-test-badge { color: var(--you-ink); background: var(--you-soft); padding: 5px 11px; border-radius: 30px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.demo-test-guide { display: flex; gap: 13px; background: var(--bg); border: 1px solid var(--rule); border-radius: var(--radius-md); padding: 17px; margin-bottom: 26px; }
+.demo-test-guide > svg { color: var(--you-ink); margin-top: 3px; }
+.demo-test-guide strong { display: block; font-size: 12px; font-weight: 500; color: var(--ink-muted); }
+.demo-test-guide span { display: block; font-size: clamp(14px, 1.6vw, 18px); font-weight: 600; letter-spacing: .045em; font-variant-numeric: tabular-nums; margin: 6px 0; }
+.demo-test-guide p { margin: 0; font-size: 12px; line-height: 1.7; color: var(--ink-muted); }
+.demo-card-fields { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 20px; }
+.demo-card-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.demo-card-field label { font-size: 13px; font-weight: 500; }
+.demo-card-field input { width: 100%; min-width: 0; min-height: 50px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); padding: 12px 14px; font-size: 16px; font-variant-numeric: tabular-nums; }
+.demo-card-field input::placeholder { color: var(--ink-muted); opacity: .75; }
+.demo-card-field input:focus-visible { border-color: var(--partner); outline-offset: 2px; }
+.demo-card-field input[aria-invalid='true'] { border-color: var(--bad); }
+.demo-field-error { color: var(--bad); font-size: 12px; line-height: 1.5; }
+.demo-card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.demo-pay-button { width: 100%; margin-top: 29px; }
+.demo-payment-privacy { display: flex; gap: 8px; justify-content: center; align-items: flex-start; color: var(--ink-muted); font-size: 11px; line-height: 1.7; margin: 18px 0 0; }
+.demo-payment-privacy svg { margin-top: 1px; }
+.demo-checkout-cancel { display: flex; justify-content: center; margin-top: 13px; font-size: 12px; color: var(--ink-muted); }
+.demo-checkout-cancel a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; text-decoration: underline; text-underline-offset: 4px; }
+.demo-checkout-success { max-width: 660px; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: clamp(26px, 4vw, 48px); }
+.demo-success-icon { color: var(--good); background: var(--good-soft); margin-bottom: 22px; }
+.demo-checkout-success > p { color: var(--ink-muted); max-width: 460px; font-size: 14px; }
+.demo-checkout-success .demo-success-note { margin: 20px 0 0; font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) {
+  .demo-payment-panel[open], .demo-checkout-success { animation: demo-checkout-appear 400ms ease both; }
+  @keyframes demo-checkout-appear { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+}
+@media (max-width: 767px) {
+  .demo-order-summary, .demo-payment-panel { padding: 24px; }
+  .demo-payment-panel { inset: auto 0 0; width: 100%; max-width: 100%; margin: 0; max-height: calc(100dvh - 24px); border-radius: 24px 24px 0 0; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+  .demo-sheet-handle { display: block; }
+  .demo-order-summary h2 { margin-bottom: 12px; }
+  .demo-summary-icon { width: 46px; height: 46px; margin-bottom: 18px; }
+  .demo-plan-price { font-size: 36px; }
+  .demo-test-guide span { font-size: 16px; }
+  .demo-plan-benefits { margin-block: 20px; gap: 10px; }
+}
+@media (max-width: 380px) {
+  .demo-order-summary, .demo-payment-panel { padding: 20px; }
+  .demo-test-guide { padding: 13px; gap: 9px; }
+  .demo-test-guide span { font-size: 14px; letter-spacing: .015em; }
+  .demo-card-row { gap: 12px; }
+}

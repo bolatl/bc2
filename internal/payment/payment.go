@@ -79,7 +79,7 @@ func (m *Mock) CreateCheckout(ctx context.Context, request CheckoutRequest) (Che
 	m.mu.Lock()
 	m.sessions[id] = request
 	m.mu.Unlock()
-	return Checkout{CheckoutSessionID: id, CheckoutURL: m.baseURL + "/checkout/success?session_id=" + url.QueryEscape(id) + "&demo=true"}, nil
+	return Checkout{CheckoutSessionID: id, CheckoutURL: m.baseURL + "/checkout/demo?session_id=" + url.QueryEscape(id) + "&demo=true"}, nil
 }
 
 func (m *Mock) VerifyCheckout(ctx context.Context, sessionID, coupleID, plan string) error {

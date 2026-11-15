@@ -36,6 +36,8 @@ Creation/join set a cookie; deletion expires it. `POST /fight-sessions` and `/sk
 
 ## State and business behavior
 
+The prototype deployment uses `FUNNEL=full`, `FREE_TURNS=5`, and `ENABLE_REHEARSAL=true`: intensity, story, three brief contextual questions, then payment before rehearsal. Legacy unconfigured server defaults are noted below. `CreateCoupleRequest` requires only `relationshipStatus`, `conflictStyle`, and `repairNeed`; older profile fields remain accepted but optional.
+
 | Session status | currentTurn | Raw history |
 |---|---|---|
 | in_progress | next_turn | Owner only |
@@ -51,6 +53,7 @@ Creation/join set a cookie; deletion expires it. `POST /fight-sessions` and `/sk
 - Backtracking reopens an already answered index and erases its answer plus later branch data. Safety-stopped, skipped, and completed sessions cannot be resumed. Skip always erases raw text.
 - Safety checks precede every LLM operation. After a stop, no crisis message, diagnosis, stopped status, or raw answer is propagated to the other partner.
 - Follow-up generation receives this owner's prior questions, answer sources, and answers, with onboarding context and optional questionnaire trait levels. It anchors follow-ups to the described situation without repeating answered questions or attributing the partner's actions to the owner.
+- Generated prompts use at most 12 words; cards at most eight words and 60 characters. Results may include `rehearsal: {optionA, optionB}` from the current rehearsal, including the unpaid preview; this is not a prediction of the partner’s reaction. The final selected or written respectful rehearsal sentence becomes the result’s opening line; a custom sentence follows the existing 300-character submit limit.
 - The result is available at the teaser paywall as a preview, or after completion. Before a preview exists it is a conflict; a saved preview may remain readable while the paid session continues. Unpaid previews use an empty `openingLine` and `locked: ["openingLine", "inviteUrl"]`. Completed full results have `locked: []`; a paid but unfinished preview still has both locks.
 - An invitation becomes shareable only after A has active payment and is ready. `inviteUrl` stays empty beforehand and for B. Joining requires the enabled opaque token. `partnerBInviteSentAt` means shareability in the current round, not proof of delivery; it resets when A starts a new round.
 - Only one outstanding round is coordinated at a time. A may start another round after both completed, or after A stopped/skipped with no active B. A stopped/skipped B may retry a fresh private session in the same round. A new unpaid attempt after consuming the free teaser requires payment. The shared journal record is created exactly once only when both are ready.
@@ -61,7 +64,7 @@ Creation/join set a cookie; deletion expires it. `POST /fight-sessions` and `/sk
 - Result and reflection generation run concurrently and commit atomically. The reflection's own time budget or repeated invalid content can produce a basic answer-based reflection; its summary explicitly states that a detailed reflection could not be prepared. This is a successful response with the same access gates. Parent cancellation and other provider failures still return `503` without committing the answer. Generated prose is checked for respectful, non-graphic language even when the input is explicit.
 - `GET /journal/{fightRecordId}` returns the shared record plus `myResult`, the caller's own private result for that round (or `null`). The partner's result is never included. Requires an active plan like the rest of the journal.
 - Terminal cleanup removes raw answers, questions, and cards. Only private derived results and shared journal aggregates remain until the couple is deleted. Personality answers are separate and may be retained.
-- Checkout confirmation is tied to the current couple and server-selected plan/amount. Only a verified paid test checkout activates access. Repeated valid confirmation is idempotent. A frontend redirect cannot activate access. Repeating checkout creation for the same pending plan returns the same ID/URL with 201; choosing a different plan while one is pending returns 409. A settled active couple cannot create another checkout.
+- Checkout confirmation is tied to the current couple and server-selected plan/amount. Stripe test mode requires a verified paid checkout; keyless mock mode verifies an issued checkout ID for the same couple and plan and then simulates success. Repeated valid confirmation is idempotent. A frontend redirect cannot activate access. Repeating checkout creation for the same pending plan returns the same ID/URL with 201; choosing a different plan while one is pending returns 409. A settled active couple cannot create another checkout. Mock creation returns a frontend `/checkout/demo?session_id=cs_mock_…&demo=true` URL; the browser presents the test-card form and submits only the checkout ID after local field validation. The API never receives cardholder name, card number, expiry, or CVC.
 
 ## Errors
 
@@ -165,20 +168,23 @@ Fields in the following objects are required unless “No” appears in the requ
 
 | Field | Type | Required | Constraints / meaning |
 |---|---|---|---|
-| `age` | [Age](#age) | Yes |  |
+| `age` | [Age](#age) | No |  |
 | `relationshipStatus` | [RelationshipStatus](#relationshipstatus) | Yes |  |
-| `togetherDuration` | [TogetherDuration](#togetherduration) | Yes |  |
-| `hasKids` | [HasKids](#haskids) | Yes |  |
+| `togetherDuration` | [TogetherDuration](#togetherduration) | No |  |
+| `hasKids` | [HasKids](#haskids) | No |  |
 | `conflictStyle` | [ConflictStyle](#conflictstyle) | Yes |  |
 | `repairNeed` | [RepairNeed](#repairneed) | Yes |  |
-| `fightTopics` | array of [FightTopic](#fighttopic) | Yes | minItems=1; maxItems=3; uniqueItems=True. One to three distinct topics. |
-| `goal` | [Goal](#goal) | Yes |  |
+| `fightTopics` | array of [FightTopic](#fighttopic) | No | minItems=1; maxItems=3; uniqueItems=True. One to three distinct topics. |
+| `goal` | [Goal](#goal) | No |  |
+
+| `partnerName` | string | No | Trimmed 1–20 Unicode characters when supplied; caller’s profile only. |
+| `source` | string | No | `instagram_facebook`, `tiktok`, `google`, `partner_link`, `friend`, or `other`. |
 
 ### JoinInviteRequest
 
 | Field | Type | Required | Constraints / meaning |
 |---|---|---|---|
-| `age` | [Age](#age) | Yes |  |
+| `age` | [Age](#age) | No |  |
 | `conflictStyle` | [ConflictStyle](#conflictstyle) | Yes |  |
 | `repairNeed` | [RepairNeed](#repairneed) | Yes |  |
 
@@ -200,7 +206,8 @@ Fields in the following objects are required unless “No” appears in the requ
 | `inviteUrl` | string | Yes | Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A. |
 | `partnerBStatus` | [PartnerBStatus](#partnerbstatus) | Yes |  |
 | `partnerBInviteSentAt` | string or null | Yes | format=date-time. Time invitation became shareable in the current round; null before readiness; not delivery confirmation. |
-| `defaultPlan` | [Plan](#plan) | Yes |  |
+| `defaultPlan` | [Plan](#plan) | Yes | `program` for engaged couples, `yearly` otherwise. |
+| `partnerName` | string | No | Name from the caller’s own profile; omitted when absent. |
 | `subscription` | [SubscriptionResponse](#subscriptionresponse) or null | Yes |  |
 | `personalityDone` | boolean | Yes | Whether the current role has completed the personality test. |
 | `createdAt` | string | Yes | format=date-time. RFC 3339 timestamp in UTC. |
@@ -278,7 +285,7 @@ Fields in the following objects are required unless “No” appears in the requ
 | `optionRight` | string | Yes | Second answer card. |
 | `progressStageIndex` | integer or null | Yes | minimum=1; maximum=6. Stage progress: full funnel facts=1, feelings=2, needs=3, partner_view=4, rehearsal=5, ready=6; short funnel counts the stages present (facts=1, feelings=2, needs=3, ready=4); null on thermometers. |
 | `turnsUsed` | integer | Yes | minimum=0. Number of answers accepted in the current branch. |
-| `turnsMax` | integer | Yes | minimum=3; maximum=12. Current budget: FREE_TURNS (3 or 4) for teaser, MAX_TURNS (7–12) for full. |
+| `turnsMax` | integer | Yes | minimum=3; maximum=12. Current budget: FREE_TURNS (3–5 full; 3–4 short) for teaser, MAX_TURNS (7–12) for full. |
 
 ### PlanOption
 
@@ -363,6 +370,7 @@ Fields in the following objects are required unless “No” appears in the requ
 | `tier` | [SessionTier](#sessiontier) | Yes |  |
 | `locked` | array of `openingLine`, `inviteUrl` | Yes | uniqueItems=True. Empty when full access is available. |
 | `reflection` | [ConversationReflection](#conversationreflection) | No | Optional for legacy results; caller-only derived themes with gated practice. |
+| `rehearsal` | object with string `optionA`, `optionB` | No | Generated opening choices when available, including unpaid preview; each at most 60 characters. |
 
 ### ConversationReflection
 
