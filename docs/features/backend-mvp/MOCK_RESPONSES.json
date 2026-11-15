@@ -27,7 +27,9 @@
         "defaultPlan": "yearly",
         "subscription": null,
         "personalityDone": false,
-        "createdAt": "2026-11-15T04:00:00Z"
+        "createdAt": "2026-11-15T04:00:00Z",
+        "partnerRole": "A",
+        "currentSessionId": null
       }
     },
     {
@@ -47,7 +49,9 @@
           "activatedAt": "2026-11-15T04:03:00Z"
         },
         "personalityDone": true,
-        "createdAt": "2026-11-15T04:00:00Z"
+        "createdAt": "2026-11-15T04:00:00Z",
+        "partnerRole": "A",
+        "currentSessionId": "session_a_demo"
       }
     },
     {
@@ -435,7 +439,8 @@
         "thermometerStart": 8,
         "thermometerEnd": 3,
         "tier": "full",
-        "locked": []
+        "locked": [],
+        "fightRecordId": "record_demo"
       }
     },
     {
@@ -461,7 +466,8 @@
         "locked": [
           "openingLine",
           "inviteUrl"
-        ]
+        ],
+        "fightRecordId": null
       }
     },
     {

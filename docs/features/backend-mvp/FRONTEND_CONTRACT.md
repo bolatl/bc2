@@ -4,7 +4,7 @@
 
 Use the API origin configured for your frontend, e.g. `http://localhost:8080`. Every browser request that uses or receives an identity must include `credentials: "include"`. Cookies are HttpOnly: the browser owns them and JavaScript must not try to create or parse them. A and B need separate browser profiles/cookie jars in the demo. After a reload, fetch the saved session ID; the backend remains the authority for stage, current turn, locks, and progress.
 
-The browser onboarding flow is: create A → optionally submit personality → create fight → answer until paywall → checkout and confirm → reload the same fight → finish → fetch A's shareable invite from `/couples/me` → B previews/joins → optionally tests personality → B starts/finishes → each polls their own result → journal rating. Show privacy/disclosure copy in the frontend; there is no disclosure endpoint.
+The browser onboarding flow is: create A → optionally submit personality → create fight → answer until paywall → checkout and confirm → reload the same fight → finish → fetch A's shareable invite from `/couples/me` → B previews/joins → optionally tests personality → B starts/finishes → each polls their own result → journal rating. Show privacy/disclosure copy in the frontend; there is no disclosure endpoint. Bootstrap with `/couples/me`: `partnerRole` identifies this browser and `currentSessionId` restores its own latest attempt in the current round (including terminal states). A null ID means this owner has not started that round; never substitute the partner's ID. Results provide `fightRecordId` for the exact completed round once both partners are ready; use it for rating rather than choosing the latest journal row.
 
 Render by `currentTurn.type` / `TurnResponse.type`, not by guessed turn counts. Use `stage` to choose thermometer controls, and use `progressStageIndex` (null for thermometers) for stage progress. Submit the current zero-based `turnIndex`; disable duplicate sends while pending. Card clicks use the exact server option or omit `answerText`; free text requires a nonempty value. Thermometer free text is an integer string from `"1"` to `"10"`. The final `ready` question requires the user's explicit confirmation.
 
@@ -132,6 +132,10 @@ export interface SubscriptionResponse {
 export interface CoupleResponse {
   /** Opaque server-generated identifier. Do not infer order or encode user data. */
   coupleId: string;
+  /** Current browser's server-verified role. */
+  partnerRole: PartnerRole;
+  /** Own latest attempt in the current round, including terminal states; never another owner's ID. */
+  currentSessionId: string | null;
   /** Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A. */
   inviteUrl: string;
   partnerBStatus: PartnerBStatus;
@@ -277,6 +281,8 @@ export interface FightSessionResponse {
 export interface FightSessionResultResponse {
   /** Opaque server-generated identifier. Do not infer order or encode user data. */
   sessionId: string;
+  /** Journal record for this exact round after both partners are ready; old sessions keep the old record. */
+  fightRecordId: string | null;
   neutralTopic: FightTopic;
   /** Private derived feeling summary. */
   feltText: string;

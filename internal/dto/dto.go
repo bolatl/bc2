@@ -18,6 +18,8 @@ type SubscriptionResponse struct {
 }
 type CoupleResponse struct {
 	CoupleID             string                `json:"coupleId"`
+	PartnerRole          string                `json:"partnerRole"`
+	CurrentSessionID     *string               `json:"currentSessionId"`
 	InviteURL            string                `json:"inviteUrl"`
 	PartnerBStatus       string                `json:"partnerBStatus"`
 	PartnerBInviteSentAt *time.Time            `json:"partnerBInviteSentAt"`
@@ -91,6 +93,7 @@ type FightSessionResponse struct {
 }
 type FightSessionResultResponse struct {
 	SessionID        string   `json:"sessionId"`
+	FightRecordID    *string  `json:"fightRecordId"`
 	NeutralTopic     string   `json:"neutralTopic"`
 	FeltText         string   `json:"feltText"`
 	NeedText         string   `json:"needText"`

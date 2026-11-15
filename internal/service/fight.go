@@ -303,7 +303,11 @@ func (a *App) FightResult(actor model.Actor, id string) (dto.FightSessionResultR
 		opening = ""
 		locked = []string{"openingLine", "inviteUrl"}
 	}
-	return dto.FightSessionResultResponse{SessionID: f.ID, NeutralTopic: f.NeutralTopic, FeltText: f.Result.FeltText, NeedText: f.Result.NeedText, OpeningLine: opening, SharedRules: append([]string{}, f.Result.SharedRules...), PartnerStatus: partnerStatus, ThermometerStart: cp(f.ThermometerStart), ThermometerEnd: cp(f.ThermometerEnd), Tier: f.Tier, Locked: locked}, nil
+	var recordID *string
+	if record, ok := a.Journal.Get(f.RoundID); ok && record.CoupleID == c.ID && record.BothReadyAt != nil {
+		recordID = cp(&record.ID)
+	}
+	return dto.FightSessionResultResponse{SessionID: f.ID, FightRecordID: recordID, NeutralTopic: f.NeutralTopic, FeltText: f.Result.FeltText, NeedText: f.Result.NeedText, OpeningLine: opening, SharedRules: append([]string{}, f.Result.SharedRules...), PartnerStatus: partnerStatus, ThermometerStart: cp(f.ThermometerStart), ThermometerEnd: cp(f.ThermometerEnd), Tier: f.Tier, Locked: locked}, nil
 }
 
 func (a *App) ownedFight(actor model.Actor, id string) (model.Couple, model.FightSession, error) {

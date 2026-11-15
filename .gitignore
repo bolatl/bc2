@@ -2,18 +2,38 @@
 .env
 .env.*
 !.env.example
+.direnv/
+.venv/
+venv/
+
+# Local dependency/tool caches
+node_modules/
+.npm/
+.vite/
+.cache/
+.eslintcache
+__pycache__/
+*.py[cod]
 
 # Build and test output
 /bin/
+/coverage/
 /coverage.out
 *.test
 *.out
-__pycache__/
+*.prof
+*.tsbuildinfo
+
+# Local multi-module Go workspace
+/go.work
+/go.work.sum
 
 # Local curl/Postman artifacts (session cookies, saved responses, screenshots)
 *.jar
 *.log
-flow.log
+*.log.*
+*.pid
+*.pid.lock
 /scripts/out/
 telegram-cloud-photo-*
 
@@ -22,6 +42,12 @@ telegram-cloud-photo-*
 .vscode/
 *.iml
 .DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*.bak
+*~
 
 # Local source material; generated documentation and project skills stay tracked.
 /LoveLab_BACKEND_PROMPT.md
@@ -30,3 +56,15 @@ telegram-cloud-photo-*
 /LoveLab_PRODUCT_BRIEF.md
 /SKILL.md
 /Business_Cup_2.0_Brief.pdf
+/backend_changes_v*.md
+/frontend.md
+/test.md
+
+# Frontend build output and browser-test artifacts
+/frontend/dist/
+/frontend/coverage/
+/frontend/playwright-report/
+/frontend/test-results/
+/frontend/blob-report/
+/frontend/playwright/.cache/
+/frontend/.auth/

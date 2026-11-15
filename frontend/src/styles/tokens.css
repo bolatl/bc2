@@ -1,0 +1,11 @@
+:root {
+  --surface: #FFFFFF;
+  --surface-subtle: #F7F7F8;
+  --ink: #171717;
+  --ink-muted: #59595F;
+  --rule: #D8D8DC;
+  --control-border: #76767C;
+  --accent: #002FA7;
+  --font-ui: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --motion-fast: 150ms;
+}
