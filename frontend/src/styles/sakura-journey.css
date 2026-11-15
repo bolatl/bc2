@@ -1,0 +1,46 @@
+.conversation-page .preparation-guide { display: block; margin-top: 12px; }
+.sakura-journey { margin: 0 0 30px; }
+.journey-window { position: relative; isolation: isolate; overflow: hidden; margin: 0 -12px; border-radius: 50%; background: radial-gradient(ellipse at 50% 48%, rgb(233 195 184 / .28), transparent 69%); }
+.journey-window svg { display: block; width: 100%; height: auto; overflow: hidden; }
+.journey-camera { transition: transform 1050ms cubic-bezier(.22, .68, .12, 1); will-change: transform; }
+.journey-branch-shadow { stroke: #dac9b9; stroke-width: 7; stroke-linecap: round; }
+.journey-branch { stroke: #8e7061; stroke-width: 3; stroke-linecap: round; }
+.journey-twig { stroke: #9c7b69; stroke-width: 1.5; stroke-linecap: round; }
+.journey-leaf { fill: #94a18a; fill-opacity: .55; }
+.journey-petals { transform-origin: 0 0; transition: transform 850ms cubic-bezier(.2, .8, .2, 1), opacity 700ms; }
+.journey-petals > path { fill: #eac2ba; stroke: #c7958e; stroke-width: .65; }
+.journey-blossom.is-current .journey-petals > path { fill: #edc3bf; stroke: #b77c7d; }
+.journey-blossom:not(.is-open) .journey-petals { opacity: 0; }
+.journey-flower-center { fill: #b88469; }
+.journey-stamen path { stroke: #b9876e; stroke-width: .6; }
+.journey-stamen circle { fill: #b9876e; }
+.journey-bud { fill: #c79d94; }
+.journey-current-halo { fill: rgb(230 189 177 / .18); stroke: rgb(195 143 133 / .16); stroke-width: 1; }
+.journey-pollen { width: 7px; height: 11px; border-radius: 90% 15% 90% 20%; background: #dcb4ab; position: absolute; pointer-events: none; opacity: .45; animation: journey-drift 12s ease-in-out infinite; }
+.journey-pollen-one { top: 28%; left: 19%; transform: rotate(-25deg); }
+.journey-pollen-two { top: 57%; right: 16%; width: 5px; height: 8px; animation-delay: -5s; }
+.sakura-journey figcaption { display: grid; gap: 6px; text-align: center; margin-top: -8px; position: relative; }
+.sakura-journey figcaption > span { font-size: 10px; color: var(--ink-muted); letter-spacing: .09em; text-transform: uppercase; }
+.sakura-journey figcaption strong { font-family: var(--font-display); color: var(--ink); font-size: 21px; line-height: 1.3; font-weight: 400; }
+.conversation-page .preparation-steps { border-top: 1px solid var(--rule); padding-top: 24px; }
+.conversation-page .preparation-steps li { font-size: 12px; }
+.conversation-page .private-space-note { background: transparent; border: 1px solid var(--rule); }
+@keyframes journey-drift { 0%, 100% { translate: 0 0; rotate: -20deg; } 50% { translate: 10px 19px; rotate: 18deg; } }
+@media (max-width: 900px) {
+  .conversation-page .preparation-guide { width: 100%; }
+  .conversation-page .preparation-steps, .conversation-page .private-space-note { display: none; }
+  .sakura-journey { margin-bottom: 0; }
+}
+@media (max-width: 767px) {
+  .conversation-page > .page-aside .page-context { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 16px; }
+  .conversation-page > .page-aside .preparation-guide { grid-column: 1 / -1; margin-top: -4px; }
+  .conversation-page > .page-aside .page-number { font-size: 23px; }
+  .conversation-page .sakura-journey { display: flex; align-items: center; gap: 4px; }
+  .conversation-page .journey-window { width: 42%; max-width: 180px; flex: 0 0 42%; margin: -12px 0 -5px; border-radius: 45%; }
+  .conversation-page .sakura-journey figcaption { text-align: left; margin-top: 0; }
+  .conversation-page .sakura-journey figcaption strong { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .journey-camera, .journey-petals { transition: none; }
+  .journey-pollen { animation: none; }
+}

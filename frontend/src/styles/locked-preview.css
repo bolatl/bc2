@@ -1,0 +1,90 @@
+.locked-preview {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  min-height: 450px;
+  padding: 54px 28px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+
+.locked-preview::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+  pointer-events: none;
+}
+
+.locked-preview-skeleton {
+  position: absolute;
+  z-index: -2;
+  inset: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  opacity: .58;
+  filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+  transform: scale(1.035);
+}
+
+.locked-preview-skeleton i,
+.locked-preview-skeleton b,
+.locked-preview-skeleton em { display: block; background: var(--control-border); border-radius: 20px; }
+.locked-preview-skeleton i { height: 8px; width: 85%; }
+.locked-preview-skeleton i:nth-child(2n) { width: 62%; }
+.locked-preview-skeleton b { width: 30px; height: 30px; background: var(--partner-soft); }
+.locked-skeleton-note { display: grid; gap: 15px; padding: 28px; border-radius: 20px; background: var(--you-soft); }
+.locked-skeleton-note i { height: 11px; background: color-mix(in srgb, var(--you) 33%, var(--surface)); }
+.locked-skeleton-note i:last-child { width: 50%; }
+.locked-skeleton-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.locked-skeleton-pair > div { display: grid; gap: 14px; padding: 24px; background: var(--surface); border-radius: 18px; }
+.locked-skeleton-pair i { width: 95%; }
+.locked-skeleton-pair b { margin-bottom: 3px; }
+.locked-skeleton-list { display: grid; gap: 0; padding: 4px 22px; border-radius: 20px; background: var(--surface); }
+.locked-skeleton-list > div { display: flex; align-items: center; gap: 18px; padding: 19px 0; border-bottom: 1px solid var(--rule); }
+.locked-skeleton-list > div:last-child { border-bottom: 0; }
+.locked-skeleton-list b { flex-shrink: 0; }
+.locked-skeleton-list i { flex: 1; }
+.locked-skeleton-list span { display: grid; flex: 1; gap: 10px; }
+.locked-skeleton-list span i { width: 72%; }
+.locked-skeleton-list span i:last-child { width: 45%; }
+.locked-skeleton-list em { width: 38px; height: 19px; background: var(--you-soft); }
+.locked-skeleton-chart { display: flex; align-items: flex-end; gap: 8%; height: 185px; flex-shrink: 0; padding: 20px 24px 0; border-bottom: 1px solid var(--control-border); }
+.locked-skeleton-chart i { width: 7%; background: var(--partner); border-radius: 8px 8px 0 0; }
+.locked-skeleton-chart i:nth-child(2n) { width: 7%; background: var(--you); }
+
+.locked-preview-content {
+  width: min(100%, 450px);
+  padding: 30px;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--surface) 85%, transparent);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface) 91%, transparent);
+  box-shadow: 0 16px 45px -28px rgb(63 56 51 / .22);
+  backdrop-filter: blur(12px);
+}
+.locked-preview-icon { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin-bottom: 17px; border: 1px solid var(--rule); border-radius: 50%; background: var(--bg); color: var(--you-ink); }
+.locked-preview-label { margin: 0 0 12px; color: var(--ink-muted); font-size: 10px; line-height: 1.6; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.locked-preview-content h2 { margin: 0 auto 14px; max-width: 340px; font-size: clamp(25px, 2.5vw, 32px); line-height: 1.18; }
+.locked-preview-description { margin: 0 auto; max-width: 340px; color: var(--ink-muted); font-size: 13px; line-height: 1.75; }
+.locked-preview-action { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; margin-top: 24px; }
+.locked-preview-action .button { min-height: 45px; font-size: 13px; }
+.locked-preview-compact { min-height: 325px; padding: 25px; }
+.locked-preview-compact .locked-preview-content { padding: 25px; }
+.locked-preview-compact .locked-preview-content h2 { font-size: 26px; }
+
+@media (max-width: 540px) {
+  .locked-preview { min-height: 390px; padding: 28px 17px; }
+  .locked-preview-content { padding: 25px 20px; }
+  .locked-preview-skeleton { inset: 18px; }
+  .locked-skeleton-pair { gap: 12px; }
+  .locked-skeleton-pair > div { padding: 18px; }
+  .locked-preview-compact { min-height: 325px; padding: 21px 16px; }
+}

@@ -1,15 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, ArrowUpRight, BookOpen, Check, CircleHelp, HeartHandshake, LockKeyhole, MessageCircle, MessageCircleHeart, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingUp, UserRound } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, BookOpen, Check, CircleHelp, Copy, Flower2, HeartHandshake, LockKeyhole, MessageCircle, MessageCircleHeart, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingUp, UserRound, UsersRound } from 'lucide-react';
 import { api, ApiError, errorMessage } from '../api/client';
-import type { Fight, FightRecord, Journal, JournalEntry, Stats } from '../api/types';
+import type { Couple, Fight, FightRecord, Journal, JournalEntry, Personality, Stats, Subscription } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page, Scale } from '../components/ui';
+import { LockedPreview } from '../components/LockedPreview';
 import '../styles/journal.css';
 
 export function topicName(topic: string) { return ({ money: 'Money', chores: 'Sharing the chores', kids: 'Parenting', family: 'Family', phone: 'Phone time', jealousy: 'Jealousy', closeness: 'Feeling close', plans_decisions: 'Plans and decisions', time_attention: 'Time and attention', other: 'Something on your mind' } as Record<string, string>)[topic] ?? topic; }
 function date(value: string) { return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+
+function SpaceSwitch({ active }: { active: 'you' | 'partner' }) {
+  return <nav className="space-switch" aria-label="Personal and partner views"><Link to="/home" aria-current={active === 'you' ? 'page' : undefined}><UserRound size={16} />Your space</Link><Link to="/partner" aria-current={active === 'partner' ? 'page' : undefined}><UsersRound size={16} />Your partner</Link></nav>;
+}
+
+function partnerState(couple: Couple) {
+  if (couple.partnerRole === 'B') return couple.partnerBStatus === 'not_invited'
+    ? { title: 'Waiting for the next invitation', description: 'Your partner has not shared their next preparation yet.', ready: false }
+    : { title: 'Ready to talk', description: 'Your partner has finished their preparation for this conversation. Take the time you need for your own.', ready: true };
+  return {
+    not_invited: { title: 'Invitation not ready yet', description: 'Finish your preparation to make an invitation available for your partner.', ready: false },
+    invited: { title: 'Ready to be invited', description: 'Your invitation is ready. Share it when you feel comfortable; your partner will prepare in their own space.', ready: false },
+    in_progress: { title: 'Preparing privately', description: 'Your partner has joined and is preparing their side. Their answers and personal summary stay private.', ready: false },
+    ready: { title: 'Ready to talk', description: 'Your partner has finished their preparation. You can bring your own words into the conversation together.', ready: true },
+  }[couple.partnerBStatus];
+}
+
+function useCurrentPreparation() {
+  const { couple } = useSession();
+  return useQuery({ queryKey: ['home-fight', couple?.coupleId, couple?.partnerRole, couple?.currentSessionId], queryFn: ({ signal }) => api<Fight>(`/fight-sessions/${couple!.currentSessionId}`, undefined, { signal }), enabled: !!couple?.currentSessionId });
+}
 
 export function HomePage() {
   const { couple, refresh } = useSession();
@@ -18,7 +40,7 @@ export function HomePage() {
   const [error, setError] = useState('');
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), []);
-  const current = useQuery({ queryKey: ['home-fight', couple?.coupleId, couple?.partnerRole, couple?.currentSessionId], queryFn: ({ signal }) => api<Fight>(`/fight-sessions/${couple!.currentSessionId}`, undefined, { signal }), enabled: !!couple?.currentSessionId });
+  const current = useCurrentPreparation();
   const status = current.data?.status;
   const completed = status === 'completed';
   const waiting = completed && (couple?.partnerRole === 'B' || couple?.partnerBStatus !== 'ready');
@@ -42,46 +64,120 @@ export function HomePage() {
       setError(errorMessage(reason));
     } finally { request.current = null; if (!controller.signal.aborted) setBusy(false); }
   }
-  const ownStatus = couple?.currentSessionId && current.isPending ? 'Checking your preparation…' : completed ? 'Ready to talk' : active ? 'Preparing privately' : 'Ready when you are';
-  const partnerStatus = couple?.partnerRole === 'A'
-    ? ({ not_invited: 'An invitation comes after your preparation', invited: 'Your invitation is ready to share', in_progress: 'Preparing their side privately', ready: 'Ready to talk' }[couple.partnerBStatus])
-    : waitingForA ? 'Preparing their side privately' : 'Ready to talk';
-  return <Page className="dashboard-page" layout="wide" eyebrow="Your space" title={active ? 'Pick up where you left off.' : completed ? 'A little understanding goes a long way.' : 'What’s on your mind?'} description="A little space to find your words. A better way to hear each other.">
-    <div className="home-workspace">
+  const ownStatus = couple?.currentSessionId && current.isPending ? 'Checking your preparation…' : current.error ? 'Unable to check' : completed ? 'Ready to talk' : active ? 'Preparing privately' : 'Ready when you are';
+  const partner = couple ? partnerState(couple) : null;
+  return <Page className="dashboard-page personal-space-page" layout="wide" eyebrow="A moment for you" title={active ? 'Continue at your own pace.' : completed ? 'Your words are ready.' : 'A little space to understand.'} description="Prepare privately. Find your words. Come back to each other.">
+    <SpaceSwitch active="you" />
+    <div className="personal-home-grid">
       <div className="home-primary">
         {waitingForA ? <div className="home-action home-action-waiting"><span className="feature-icon"><MessageCircleHeart size={28} /></span><p className="eyebrow">Your next conversation</p><h2>Give them a little room.</h2><p>Your partner is preparing for your next conversation. Your own preparation will be available when they are ready.</p><Button variant="secondary" onClick={() => void refresh().catch(() => undefined)}><RefreshCw size={17} />Check again</Button></div>
           : couple?.currentSessionId && current.isPending ? <div className="dashboard-card"><Loading /></div>
           : current.error ? <Notice kind="error">{errorMessage(current.error)} <Button variant="text" onClick={() => void current.refetch()}>Try again</Button></Notice>
           : <div className="home-action">
-            <div className="home-action-top"><span className="feature-icon"><MessageCircleHeart size={28} aria-hidden="true" /></span><span className="privacy-pill"><LockKeyhole size={13} />Just for you</span></div>
+            <div className="home-action-top"><span className="feature-icon"><Flower2 size={30} strokeWidth={1.3} aria-hidden="true" /></span><span className="privacy-pill"><LockKeyhole size={13} />Only you</span></div>
             <p className="eyebrow">Your private preparation</p>
-            <h2>{active ? 'Your conversation is waiting' : completed ? 'Your words are ready' : 'Start with your side'}</h2>
-            <p>{active ? 'Return to the same step while your preparation is active, and take it at your own pace.' : completed ? 'Keep your first sentence close. Revisit your guide before you talk to each other.' : 'What happened, what hurt, and what you need. We’ll help you turn it into words you can share.'}</p>
+            <h2>{active ? 'Pick up your conversation' : completed ? 'Keep your first sentence close' : 'Start with what matters to you'}</h2>
+            <p>{active ? 'Your current step is waiting. Take a breath, and continue with what feels true for you.' : completed ? 'Revisit your personal guide before you talk. There is room for both of your perspectives.' : 'A few guided questions can help you understand what happened, what you felt, and what you need.'}</p>
             <div className="actions">{active || completed ? <Link className="button button-primary" to={`/fight-sessions/${couple?.currentSessionId}${completed ? '/result' : ''}`}>{completed ? 'View your guide' : 'Continue conversation'}<ArrowRight size={18} /></Link> : <Button disabled={busy} onClick={() => void start()}>{busy ? 'Getting ready…' : 'Start a conversation'}<ArrowRight size={18} /></Button>}
               {completed && !waiting && <Button disabled={busy} variant="text" onClick={() => void start()}>Start another conversation</Button>}
             </div>
           </div>}
         {error && <Notice kind="error">{error}</Notice>}
       </div>
-      <aside className="home-partners dashboard-card">
-        <span className="feature-icon feature-icon-partner"><HeartHandshake size={25} /></span>
-        <h2>Two sides. One conversation.</h2>
-        <p>You each prepare separately. Your private answers stay your own.</p>
-        <div className="partner-status-row"><span className="person-badge person-you"><UserRound size={18} /></span><div><b>You</b><span>{ownStatus}</span></div>{completed && <Check size={18} className="ready-check" />}</div>
-        <div className="partner-status-row"><span className="person-badge person-partner"><UserRound size={18} /></span><div><b>Your partner</b><span>{partnerStatus}</span></div></div>
-        {waiting && <p className="partner-next-note">{couple?.partnerRole === 'A' ? 'Open your guide to share the invitation whenever you’re ready.' : 'You have finished your preparation for this conversation.'}</p>}
+      <aside className="personal-pair-card dashboard-card">
+        <div className="personal-card-heading"><UsersRound size={21} /><h2>Where you both are</h2></div>
+        <div className="partner-status-row"><span className="person-badge person-you"><UserRound size={18} /></span><div><b>You</b><span>{ownStatus}</span></div>{completed && <Check size={17} className="ready-check" />}</div>
+        <div className="partner-status-row"><span className="person-badge person-partner"><UserRound size={18} /></span><div><b>Your partner</b><span>{partner?.title}</span></div>{partner?.ready && <Check size={17} className="ready-check" />}</div>
+        <p>You each have your own space. Only your readiness is shared.</p>
+        <Link className="text-link" to="/partner">View partner’s progress<ArrowUpRight size={16} /></Link>
       </aside>
     </div>
-    <div className="home-links">
-      <Link className="dashboard-link" to="/journal"><span className="feature-icon feature-icon-partner"><BookOpen size={24} /></span><span><strong>Your shared journal</strong><span>Look back at the conversations you’ve had and how they felt.</span></span><ArrowUpRight size={22} /></Link>
-      <Link className="dashboard-link" to={couple?.personalityDone ? '/personality/result' : '/personality'}><span className="feature-icon feature-icon-soft"><Sparkles size={24} /></span><span><strong>{couple?.personalityDone ? 'Your personal profile' : 'Get to know your patterns'}</strong><span>{couple?.personalityDone ? 'Revisit your strengths and small things to try.' : 'An optional 20-question reflection on how you connect.'}</span></span><ArrowUpRight size={22} /></Link>
+    <div className="home-links personal-home-links">
+      <Link className="dashboard-link" to="/journal"><span className="feature-icon feature-icon-partner"><BookOpen size={24} strokeWidth={1.4} /></span><span><strong>Your shared journal</strong><span>Look back at your conversations and check in on how they felt.</span></span><ArrowUpRight size={20} /></Link>
+      <Link className="dashboard-link" to="/profile"><span className="feature-icon feature-icon-soft"><UserRound size={24} strokeWidth={1.4} /></span><span><strong>My profile</strong><span>{couple?.personalityDone ? 'Revisit your personal reflection, your plan, and privacy settings.' : 'Get to know your patterns, and manage your personal space.'}</span></span><ArrowUpRight size={20} /></Link>
     </div>
   </Page>;
 }
 
-function AccessNotice({ error, retry }: { error: unknown; retry: () => void }) {
+export function PartnerPage() {
+  const { couple, refresh } = useSession();
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const current = useCurrentPreparation();
+  const refreshPreparation = current.refetch;
+  const hasPreparation = Boolean(couple?.currentSessionId);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void Promise.all([refresh(), ...(hasPreparation ? [refreshPreparation({ throwOnError: true })] : [])]).catch(() => undefined);
+      }
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [refresh, refreshPreparation, hasPreparation]);
+  async function check() {
+    if (checking) return;
+    setChecking(true); setError('');
+    try { await Promise.all([refresh(), ...(hasPreparation ? [refreshPreparation({ throwOnError: true })] : [])]); }
+    catch (reason) { setError(errorMessage(reason)); }
+    finally { setChecking(false); }
+  }
+  async function copy() {
+    if (!couple?.inviteUrl) return;
+    try { await navigator.clipboard.writeText(couple.inviteUrl); setCopied(true); setCopyError(false); }
+    catch { setCopyError(true); }
+  }
+  const partner = couple ? partnerState(couple) : null;
+  const ownReady = current.data?.status === 'completed';
+  return <Page className="partner-space-page personal-space-page" layout="wide" eyebrow="Your shared space" title="Two perspectives. Room for both." description="See where your partner is, while giving each other space to prepare.">
+    <SpaceSwitch active="partner" />
+    <div className="partner-space-grid">
+      <section className="partner-preparation-card dashboard-card">
+        <div className="partner-view-label"><span className="person-badge person-partner"><UserRound size={24} /></span><div><span className="eyebrow">Your partner</span><p>Preparation status</p></div><span className={`readiness-badge ${partner?.ready ? 'is-ready' : ''}`}>{partner?.ready ? <Check size={14} /> : <Flower2 size={15} />}{partner?.ready ? 'Ready' : 'In their own time'}</span></div>
+        <h2>{partner?.title}</h2><p className="partner-state-description">{partner?.description}</p>
+        {couple?.partnerRole === 'A' && <ol className="partner-progress" aria-label="Your partner’s preparation progress">{['Invite ready', 'Preparing', 'Ready to talk'].map((label, index) => {
+          const reached = { not_invited: -1, invited: 0, in_progress: 1, ready: 2 }[couple.partnerBStatus];
+          return <li key={label} className={index <= reached ? 'reached' : ''} aria-current={index === reached ? 'step' : undefined}>{label}</li>;
+        })}</ol>}
+        <div className="pair-readiness" aria-label="Both partners’ readiness"><div><span className={`person-badge person-you ${ownReady ? 'is-ready' : ''}`}>{ownReady ? <Check size={24} /> : <UserRound size={24} />}</span><strong>You</strong><span>{couple?.currentSessionId && current.isPending ? 'Checking…' : current.error ? 'Unable to check' : ownReady ? 'Ready to talk' : 'Your own preparation'}</span></div><span className="pair-readiness-connection" aria-hidden="true"><Flower2 size={21} /></span><div><span className={`person-badge person-partner ${partner?.ready ? 'is-ready' : ''}`}>{partner?.ready ? <Check size={24} /> : <UserRound size={24} />}</span><strong>Your partner</strong><span>{partner?.ready ? 'Ready to talk' : 'Not ready yet'}</span></div></div>
+        <div className="actions">{couple?.partnerRole === 'A' && couple.inviteUrl && <Button onClick={() => void copy()}>{copied ? <Check size={17} /> : <Copy size={17} />}{copied ? 'Link copied' : 'Copy invite link'}</Button>}<Button variant="secondary" disabled={checking} onClick={() => void check()}><RefreshCw size={16} />{checking ? 'Checking…' : 'Refresh status'}</Button></div>
+        {copyError && <label className="form-field invite-copy-field">Copy this link to share<input readOnly value={couple?.inviteUrl || ''} onFocus={event => event.currentTarget.select()} /></label>}
+        {error && <Notice kind="error">{error}</Notice>}
+      </section>
+      <aside className="partner-space-aside">
+        <section className="partner-privacy-card"><LockKeyhole size={22} strokeWidth={1.4} /><h2>A little privacy helps you be honest.</h2><p>This view shares readiness, not your partner’s answers, personality reflection, or personal summary.</p><Link className="text-link" to="/home">Return to your own space<ArrowUpRight size={16} /></Link></section>
+        <Link className="dashboard-link partner-journal-link" to="/journal"><BookOpen size={23} strokeWidth={1.4} /><span><strong>Your shared journal</strong><span>Once you have both prepared, your conversation appears here.</span></span><ArrowUpRight size={18} /></Link>
+      </aside>
+    </div>
+  </Page>;
+}
+
+export function ProfilePage() {
   const { couple } = useSession();
-  if (error instanceof ApiError && error.status === 402) return <Notice>{couple?.partnerRole === 'A' ? <>Your shared journal is included with your couple’s plan.<div className="actions"><Link className="button button-primary" to="/paywall">View plans<ArrowRight size={18} /></Link></div></> : 'Your shared journal will be available after your partner activates a plan.'}</Notice>;
+  const profile = useQuery({ queryKey: ['profile-reflection', couple?.coupleId, couple?.partnerRole], queryFn: ({ signal }) => api<Personality>('/personality-tests/me', undefined, { signal }), enabled: Boolean(couple?.personalityDone) });
+  const plan = useQuery({ queryKey: ['profile-subscription', couple?.coupleId, couple?.partnerRole], queryFn: ({ signal }) => api<Subscription>('/subscriptions/me', undefined, { signal }), enabled: Boolean(couple) });
+  const planTitles = { monthly: 'Monthly plan', yearly: 'Yearly plan', program: 'Couples program' };
+  const planStatus = plan.data?.status;
+  return <Page className="profile-page personal-space-page" layout="wide" eyebrow="My profile" title="Your space, made personal." description="Your reflection, your access, and the things you choose to keep.">
+    <div className="profile-workspace">
+      <aside className="profile-identity-card dashboard-card"><span className="profile-avatar"><UserRound size={34} strokeWidth={1.2} /></span><h2>You</h2><span className="profile-role">Partner {couple?.partnerRole}</span><p>Your private Love Lab profile in this browser.</p><dl><div><dt>Shared space created</dt><dd>{couple ? date(couple.createdAt) : '—'}</dd></div><div><dt>Personal reflection</dt><dd>{couple?.personalityDone ? 'Completed' : 'Not started'}</dd></div></dl><Link className="text-link" to="/home">Your conversations<ArrowUpRight size={16} /></Link></aside>
+      <div className="profile-sections">
+        <section className="profile-reflection-card dashboard-card"><div className="personal-card-heading"><Sparkles size={22} strokeWidth={1.4} /><div><p className="eyebrow">Your personal reflection</p><h2>A little more self-understanding.</h2></div></div>
+          {couple?.personalityDone ? profile.isPending ? <Loading label="Opening your reflection…" /> : profile.error ? <Notice kind="error">{errorMessage(profile.error)}<Button variant="text" onClick={() => void profile.refetch()}>Try again</Button></Notice> : profile.data && <><p>From your reflection on {date(profile.data.completedAt)}. These are starting points for understanding yourself.</p><ul className="profile-strengths">{profile.data.strengths.map(strength => <li key={strength}><Flower2 size={16} /><span>{strength}</span></li>)}</ul><Link className="button button-secondary" to="/personality/result">View your full reflection<ArrowUpRight size={16} /></Link></> : <><p>Explore how you connect, react, and make room for each other with an optional 20-question reflection.</p><Link className="button button-secondary" to="/personality">Explore your patterns<ArrowRight size={17} /></Link></>}
+        </section>
+        <div className="profile-details-grid">
+          <section className="profile-plan-card dashboard-card"><span className="feature-icon feature-icon-partner"><HeartHandshake size={23} strokeWidth={1.4} /></span><h2>Your shared plan</h2>{plan.isPending ? <Loading label="Checking your plan…" /> : plan.error ? <Notice kind="error">{errorMessage(plan.error)}<Button variant="text" onClick={() => void plan.refetch()}>Try again</Button></Notice> : <><p className="profile-plan-status">{planStatus === 'active' ? 'Full access is active' : planStatus === 'pending' ? 'Checkout is waiting' : 'No active plan'}</p><p>{planStatus === 'active' ? `${plan.data?.activatedAt ? planTitles[plan.data.plan] + '. ' : ''}Your couple can access full preparations, your journal, and shared check-ins.` : planStatus === 'pending' ? 'Finish your existing checkout to open full access for both of you.' : 'One plan opens full preparations and your shared journal for both partners.'}</p>{planStatus !== 'active' && (couple?.partnerRole === 'A' ? <Link className="text-link" to="/paywall">{planStatus === 'pending' ? 'Resume checkout' : 'View plans'}<ArrowUpRight size={16} /></Link> : <p className="quiet">Your partner manages your couple’s plan.</p>)}</>}</section>
+          <section className="profile-settings-card dashboard-card"><span className="feature-icon feature-icon-soft"><ShieldCheck size={23} strokeWidth={1.4} /></span><h2>Privacy &amp; your data</h2><p>Your personal answers and reflection stay private from your partner. Keep this browser’s cookies to return to your profile.</p><Link className="text-link" to="/settings">Manage your data<ArrowUpRight size={16} /></Link></section>
+        </div>
+      </div>
+    </div>
+  </Page>;
+}
+
+function AccessNotice({ error, retry, variant = 'journal' }: { error: unknown; retry: () => void; variant?: 'journal' | 'patterns' }) {
+  const { couple } = useSession();
+  if (error instanceof ApiError && error.status === 402) return <LockedPreview variant={variant} title={variant === 'patterns' ? 'See your patterns over time.' : 'A place for your conversations.'} description={couple?.partnerRole === 'A' ? 'Your couple’s plan includes a shared journal, personal conversation guides, and check-ins over time.' : 'This part of your shared space opens when your partner activates a plan.'} action={couple?.partnerRole === 'A' ? <Link className="button button-primary" to="/paywall">View plans<ArrowRight size={18} /></Link> : <Link className="button button-secondary" to="/home">Return to your space<ArrowRight size={18} /></Link>} />;
   return <Notice kind="error">{errorMessage(error)}<Button variant="text" onClick={retry}>Try again</Button></Notice>;
 }
 
@@ -190,7 +286,7 @@ export function StatsPage() {
   const data = query.data;
   return <Page className="patterns-page" layout="wide" eyebrow="Your patterns" title="A little perspective over time." description="Some things get easier to understand when you look at them together.">
     <div className="subnav"><Link to="/journal"><BookOpen size={17} />Conversations</Link><span><TrendingUp size={17} />Patterns</span></div>
-    {query.isPending ? <Loading /> : query.error ? <AccessNotice error={query.error} retry={() => void query.refetch()} /> : data && data.totalFights === 0 ? <div className="journal-empty dashboard-card"><span className="feature-icon feature-icon-partner"><TrendingUp size={30} /></span><h2>There’s no pattern to show just yet.</h2><p>After you both prepare for a conversation, you’ll start to see your shared history here.</p><Link className="button button-primary" to="/home">Back to your space<ArrowRight size={18} /></Link></div> : data && <>
+    {query.isPending ? <Loading /> : query.error ? <AccessNotice error={query.error} retry={() => void query.refetch()} variant="patterns" /> : data && data.totalFights === 0 ? <div className="journal-empty dashboard-card"><span className="feature-icon feature-icon-partner"><TrendingUp size={30} /></span><h2>There’s no pattern to show just yet.</h2><p>After you both prepare for a conversation, you’ll start to see your shared history here.</p><Link className="button button-primary" to="/home">Back to your space<ArrowRight size={18} /></Link></div> : data && <>
       <div className="patterns-grid">
         <div className="patterns-overview"><div className="stat-line"><span className="feature-icon"><MessageCircleHeart size={25} /></span><strong>{data.totalFights}</strong><span>conversations<br />in your journal</span><p>Each one is a chance to understand each other a little better.</p></div>
           {data.recurringTopicHint && <div className="recurring-topic"><span className="eyebrow">A recurring topic</span><h2>{topicName(data.recurringTopicHint)}</h2><p>This has come up in several conversations. It may be worth making a little time for it.</p><Link className="text-link" to="/home">Return to your space<ArrowUpRight size={16} /></Link></div>}

@@ -1,12 +1,14 @@
 import { useEffect, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ArrowUpRight, BookOpen, ChartNoAxesCombined, HeartHandshake, LockKeyhole, Settings2 } from 'lucide-react';
+import { ArrowUpRight, BookOpen, ChartNoAxesCombined, HeartHandshake, LockKeyhole, Settings2, UsersRound } from 'lucide-react';
 import { useSession } from './session';
 import { BrandMark, Button, Loading, Notice, Page } from '../components/ui';
+import { SakuraBackdrop } from '../components/SakuraBackdrop';
 import { WelcomePage, OnboardingPage, ChoosePage, PersonalityPage, PersonalityResultPage, InvitePage } from '../features/Onboarding';
 import { FightPage, ResultPage, PaywallPage, CheckoutSuccessPage, CheckoutCancelPage } from '../features/Conversation';
-import { HomePage, JournalPage, JournalEntryPage, RatingPage, StatsPage, SettingsPage } from '../features/Journal';
+import { HomePage, PartnerPage, ProfilePage, JournalPage, JournalEntryPage, RatingPage, StatsPage, SettingsPage } from '../features/Journal';
 import { config } from '../config';
+import '../styles/botanical.css';
 
 function Protected({ children }: { children: ReactNode }) {
   const { couple, loading, checking, error, refresh } = useSession();
@@ -20,9 +22,10 @@ export function App() {
   const location = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
   return <div className={`app-shell ${couple ? 'app-authenticated' : 'app-public'}`} data-partner={couple?.partnerRole || 'A'}>
+    <SakuraBackdrop />
     <a href="#main" className="skip-link">Skip to content</a>
     <header className="site-header"><Link to={couple ? '/home' : '/'} className="brand" aria-label="Love Lab home"><BrandMark size={40} /><span>love lab</span></Link>
-      {couple ? <><nav className="app-nav" aria-label="Main navigation"><NavLink to="/home"><HeartHandshake size={17} aria-hidden="true" />Your space</NavLink><NavLink to="/journal"><BookOpen size={17} aria-hidden="true" />Journal</NavLink><NavLink to="/stats"><ChartNoAxesCombined size={17} aria-hidden="true" />Patterns</NavLink></nav><div className="header-account"><span className="account-label"><LockKeyhole size={13} aria-hidden="true" />Your private space</span><NavLink to="/settings" className="settings-link" aria-label="Settings"><span className="account-avatar">{couple.partnerRole}</span><Settings2 size={17} aria-hidden="true" /></NavLink></div></> : <><nav className="public-nav" aria-label="Main navigation"><a href="/#how-it-works">How it works</a><a href="/#questions">Questions</a></nav><Link className="header-cta" to="/onboarding">Start a conversation<ArrowUpRight size={16} aria-hidden="true" /></Link></>}
+      {couple ? <><nav className="app-nav" aria-label="Main navigation"><NavLink to="/home"><HeartHandshake size={17} aria-hidden="true" />Your space</NavLink><NavLink to="/partner"><UsersRound size={17} aria-hidden="true" />Partner</NavLink><NavLink to="/journal"><BookOpen size={17} aria-hidden="true" />Journal</NavLink><NavLink to="/stats"><ChartNoAxesCombined size={17} aria-hidden="true" />Patterns</NavLink></nav><div className="header-account"><NavLink to="/profile" className="profile-link" aria-label="My profile"><span className="account-avatar">{couple.partnerRole}</span><span>My profile</span></NavLink><NavLink to="/settings" className="settings-link" aria-label="Settings"><Settings2 size={18} aria-hidden="true" /></NavLink></div></> : <><nav className="public-nav" aria-label="Main navigation"><a href="/#how-it-works">How it works</a><a href="/#questions">Questions</a></nav><Link className="header-cta" to="/onboarding">Start a conversation<ArrowUpRight size={16} aria-hidden="true" /></Link></>}
     </header>
     {(config.llmMode === 'mock' || config.paymentMode === 'mock' || config.paymentMode === 'stripe_test') && <div className="mode-note">{[config.llmMode === 'mock' ? 'Demo responses' : null, config.paymentMode === 'mock' ? 'Simulated payment — no charge' : config.paymentMode === 'stripe_test' ? 'Test payment' : null].filter(Boolean).join(' · ')}</div>}
     <main id="main"><Routes>
@@ -31,6 +34,8 @@ export function App() {
       <Route path="/invites/:token" element={<InvitePage />} />
       <Route path="/choose" element={<Protected><ChoosePage /></Protected>} />
       <Route path="/home" element={<Protected><HomePage /></Protected>} />
+      <Route path="/partner" element={<Protected><PartnerPage /></Protected>} />
+      <Route path="/profile" element={<Protected><ProfilePage /></Protected>} />
       <Route path="/personality" element={<Protected><PersonalityPage /></Protected>} />
       <Route path="/personality/result" element={<Protected><PersonalityResultPage /></Protected>} />
       <Route path="/fight-sessions/:id" element={<Protected><FightPage /></Protected>} />

@@ -6,6 +6,7 @@ import { api, ApiError } from '../api/client';
 import type { CreateCouple, Fight, Invite, JoinInvite, Personality } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page } from '../components/ui';
+import { SakuraBough } from '../components/SakuraBackdrop';
 import { partnerQuestions, personalityQuestions, personalityScale, profileQuestions, type ProfileField, type ProfileQuestion } from '../content/profile';
 
 import '../styles/onboarding.css';
@@ -57,6 +58,7 @@ export function WelcomePage() {
         <p className="welcome-private"><LockKeyhole size={14} aria-hidden="true" />Prepare privately. Invite your partner when you’re ready.</p>
       </div>
       <div className="welcome-example" aria-labelledby="example-heading">
+        <SakuraBough className="welcome-bough" />
         <div className="example-heading-row"><span className="example-icon"><MessageCircleHeart size={24} aria-hidden="true" /></span><span className="example-label">Conversation example</span></div>
         <h2 id="example-heading">Same moment.<br />A different way to start.</h2>
         <div className="example-sentence example-sentence-before">
@@ -113,7 +115,7 @@ function ProfileWizard({ questions, onComplete, busy, error, partner = false }: 
     if (isLast) onComplete(answers);
     else setStep(step + 1);
   }
-  return <Page className={`wizard-page ${partner ? 'wizard-partner' : ''}`} number={String(step + 1).padStart(2, '0')} eyebrow={`${partner ? 'Your own perspective' : 'A little about you'} · ${step + 1} of ${questions.length}`} title={question.title} description={question.description}>
+  return <Page transitionKey={`profile-${step}`} className={`wizard-page ${partner ? 'wizard-partner' : ''}`} number={String(step + 1).padStart(2, '0')} eyebrow={`${partner ? 'Your own perspective' : 'A little about you'} · ${step + 1} of ${questions.length}`} title={question.title} description={question.description}>
     <div className="wizard-progress" role="progressbar" aria-label="Profile questions" aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) / questions.length * 100}%` }} /></div>
     <form onSubmit={submit} className="stack">
       <fieldset className="form-field" disabled={busy}>
@@ -216,7 +218,7 @@ export function PersonalityPage() {
       if (!signal.aborted) navigate('/personality/result', { replace: true });
     });
   }
-  return <Page className="wizard-page personality-page" number={String(step + 1).padStart(2, '0')} eyebrow={`Your profile · ${step + 1} of 20`} title={personalityQuestions[step]} description="How accurately does this describe you?">
+  return <Page transitionKey={`personality-${step}`} className="wizard-page personality-page" number={String(step + 1).padStart(2, '0')} eyebrow={`Your profile · ${step + 1} of 20`} title={personalityQuestions[step]} description="How accurately does this describe you?">
     <div className="wizard-progress" role="progressbar" aria-label="Personality questions" aria-valuemin={0} aria-valuemax={20} aria-valuenow={step + 1}><span style={{ width: `${(step + 1) / 20 * 100}%` }} /></div>
     <form onSubmit={submit} className="stack">
       <fieldset className="form-field" disabled={busy}><legend className="sr-only">How accurately does this describe you?</legend>

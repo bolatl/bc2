@@ -5,6 +5,8 @@ import { api, ApiError } from '../api/client';
 import type { Checkout, Couple, Fight, PlanOption, Result, Subscription, TurnResponse } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page, Scale } from '../components/ui';
+import { LockedPreview } from '../components/LockedPreview';
+import { SakuraJourney } from '../components/SakuraJourney';
 import { config } from '../config';
 import { useSpeechToText } from '../hooks/useSpeechToText';
 import '../styles/conversation.css';
@@ -18,12 +20,13 @@ const stageTitles: Record<string, string> = {
 };
 const topicLabel = (value: string) => value.replaceAll('_', ' ').replace(/^./, c => c.toUpperCase());
 
-function PreparationAside({ stage, turns }: { stage: string; turns: Fight['turns'] }) {
+function PreparationAside({ stage, turns, checkpoint = false }: { stage: string; turns: Fight['turns']; checkpoint?: boolean }) {
   const perspectiveStages = ['partner_view', 'rehearsal'];
   const hasPerspective = perspectiveStages.includes(stage) || turns.some(turn => perspectiveStages.includes(turn.stage));
   const labels = ['Understand your side', ...(hasPerspective ? ['Find a little perspective'] : []), 'Get ready to talk'];
   const active = ['thermometer_end', 'ready'].includes(stage) ? labels.length - 1 : perspectiveStages.includes(stage) ? 1 : 0;
   return <div className="preparation-guide">
+    <SakuraJourney stage={stage} label={stageTitles[stage] ?? stage} turns={turns} checkpoint={checkpoint} />
     <ol className="preparation-steps">{labels.map((label, index) => <li key={label} className={index === active ? 'current' : index < active ? 'complete' : ''} aria-current={index === active ? 'step' : undefined}><span aria-hidden="true">{index < active ? <Check size={15} /> : index + 1}</span>{label}</li>)}</ol>
     <div className="private-space-note"><ShieldCheck size={21} aria-hidden="true" /><h2>A little space, just for you.</h2><p>Your partner won’t see your answers. Take a moment to figure out what you want to say.</p></div>
   </div>;
@@ -224,7 +227,7 @@ export function FightPage() {
     <div className="conversation-navigation"><Button variant="text" disabled={locked || !fight.turns.length} onClick={() => setConfirm('back')}><ArrowLeft size={16} aria-hidden="true" />Back</Button><Button variant="text" disabled={locked} onClick={() => setConfirm('skip')}>Skip this topic</Button></div>
     {fight.turns.length > 0 && <details className="history"><summary>Your earlier answers<ChevronDown size={17} aria-hidden="true" /></summary>{fight.turns.map(turn => <div className="history-row" key={turn.turnIndex}><p className="eyebrow">{stageTitles[turn.stage]}</p><p>{turn.agentQuestion}</p><p className="your-answer">{turn.answerText}</p></div>)}</details>}
   </>;
-  if (current?.type === 'checkpoint') return <Page number={<MessageSquareText size={42} aria-hidden="true" />} eyebrow="A moment to check in" title={current.question} className={`conversation-page checkpoint-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={current.afterStage} turns={fight.turns} />}>
+  if (current?.type === 'checkpoint') return <Page transitionKey={fightStep(fight)} number={<MessageSquareText size={42} aria-hidden="true" />} eyebrow="A moment to check in" title={current.question} className={`conversation-page checkpoint-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={current.afterStage} turns={fight.turns} checkpoint />}>
     <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Your private preparation</span><span>{fight.turns.length} answers saved</span></div>
     {feedback}
     <section className="checkpoint-summary" aria-label="Your private checkpoint summary">
@@ -243,7 +246,7 @@ export function FightPage() {
   const thermometer = question.stage === 'thermometer_start' || question.stage === 'thermometer_end';
   const number = question.progressStageIndex === null ? question.stage === 'thermometer_start' ? 'Before' : 'After' : String(question.progressStageIndex).padStart(2, '0');
   const count = [...draft].length;
-  return <Page number={number} eyebrow={stageTitles[question.stage]} title={question.agentQuestion} className={`conversation-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} turns={fight.turns} />}>
+  return <Page transitionKey={fightStep(fight)} number={number} eyebrow={stageTitles[question.stage]} title={question.agentQuestion} className={`conversation-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} turns={fight.turns} />}>
     <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Your private preparation</span><span>{question.turnsUsed} / {question.turnsMax} answers</span></div>
     {question.stage === 'thermometer_start' && <ProcessingNote />}
     {feedback}
@@ -306,7 +309,7 @@ export function ResultPage() {
   if (resource.loading && !result) return <Loading label="Opening your personal summary…" />;
   if (!result) return <Page title="Your personal summary"><Notice>{resource.error || 'Your summary is not ready yet.'}</Notice><div className="actions"><Button onClick={() => void resource.load()}>Try again</Button><Link to={`/fight-sessions/${id}`}>Return to conversation</Link></div></Page>;
   const locked = result.locked.includes('openingLine');
-  if (locked) return <Page eyebrow="Your first insight" title="A little more clarity."><p className="lead">{result.feltText}</p><p>{result.needText}</p><Link className="button button-primary" to={couple?.subscription?.status === 'active' ? `/fight-sessions/${id}` : `/paywall?sessionId=${encodeURIComponent(id)}`}>Continue your conversation <ArrowRight size={18} /></Link></Page>;
+  if (locked) return <Page eyebrow="Your first insight" title="A little more clarity." layout="wide"><p className="lead">{result.feltText}</p><p>{result.needText}</p><LockedPreview variant="guide" action={<Link className="button button-primary" to={couple?.subscription?.status === 'active' ? `/fight-sessions/${id}` : `/paywall?sessionId=${encodeURIComponent(id)}`}>Continue your conversation <ArrowRight size={18} /></Link>} /></Page>;
   const canInvite = couple?.partnerRole === 'A' && !result.locked.includes('inviteUrl') && Boolean(couple.inviteUrl) && couple.currentSessionId === id;
   async function copyInvite() {
     if (!couple?.inviteUrl) return;
@@ -368,6 +371,7 @@ export function PaywallPage() {
   const navigate = useNavigate();
   const { couple, refresh } = useSession();
   const id = params.get('sessionId');
+  const subscriptionResource = useResource<Subscription>('/subscriptions/me');
   const fightResource = useResource<Fight>(id ? `/fight-sessions/${encodeURIComponent(id)}` : null);
   const resultResource = useResource<Result>(id ? `/fight-sessions/${encodeURIComponent(id)}/result` : null);
   const [selected, setSelected] = useState('');
@@ -375,8 +379,9 @@ export function PaywallPage() {
   const [skipConfirm, setSkipConfirm] = useState(false);
   const operation = useOperation();
   const plans = fightResource.data?.currentTurn?.type === 'paywall_required' ? fightResource.data.currentTurn.availablePlans : fallbackPlans;
-  const pending = couple?.subscription?.status === 'pending';
-  const selectedPlan = pending ? couple.subscription!.plan : selected || plans.find(plan => plan.isDefault)?.plan || couple?.defaultPlan || 'monthly';
+  const subscription = subscriptionResource.data ?? couple?.subscription;
+  const pending = subscription?.status === 'pending';
+  const selectedPlan = pending ? subscription.plan : selected || plans.find(plan => plan.isDefault)?.plan || couple?.defaultPlan || 'monthly';
 
   async function checkout() {
     if (!couple || operation.inFlight.current) return;
@@ -389,7 +394,7 @@ export function PaywallPage() {
       if (target.protocol !== 'http:' && target.protocol !== 'https:') throw new Error('Unsupported checkout URL');
       window.location.assign(target.href);
     } catch (e) {
-      if (!operation.controller.current.signal.aborted) { setError(errorText(e, 'Checkout is unavailable. Please try again.')); await refresh().catch(() => undefined); }
+      if (!operation.controller.current.signal.aborted) { setError(errorText(e, 'Checkout is unavailable. Please try again.')); await Promise.allSettled([refresh(), subscriptionResource.load(true)]); }
     } finally { operation.inFlight.current = false; operation.setBusy(false); }
   }
 
@@ -404,16 +409,19 @@ export function PaywallPage() {
   }
 
   if (couple?.partnerRole === 'B') return <Page title="Your partner manages your shared plan."><p className="lead">You join free when your couple has an active plan.</p><Link to="/home" className="text-link">Return home</Link></Page>;
-  if (couple?.subscription?.status === 'active') return <Page title="Your shared plan is active."><Link className="button button-primary" to={id ? `/fight-sessions/${id}` : '/home'}>Continue <ArrowRight size={18} /></Link></Page>;
+  if (subscriptionResource.loading) return <Loading label="Checking your plan…" />;
+  if (subscriptionResource.error) return <Page title="Your shared plan"><Notice kind="error">{subscriptionResource.error}</Notice><Button onClick={() => void subscriptionResource.load()}>Try again</Button></Page>;
+  if (subscription?.status === 'active') return <Page title="Your shared plan is active."><Link className="button button-primary" to={id ? `/fight-sessions/${id}` : '/home'}>Continue <ArrowRight size={18} /></Link></Page>;
   if (id && (fightResource.loading || resultResource.loading)) return <Loading label="Opening your first insight…" />;
   if (id && (!fightResource.data || !resultResource.data)) return <Page title="Your first insight"><Notice>{fightResource.error || resultResource.error || 'Your insight is not available yet.'}</Notice><div className="actions"><Button onClick={() => { void fightResource.load(); void resultResource.load(); }}>Try again</Button><Link to={`/fight-sessions/${id}`}>Return to conversation</Link></div></Page>;
   return <Page eyebrow="One plan. Both of you." title="Keep the conversation going." layout="wide" className="paywall-page">
     <div className="paywall-workspace">
       <div className="paywall-benefits">
         {resultResource.data && <section className="preview-insight"><span className="insight-symbol"><Sparkles size={26} aria-hidden="true" /></span><p className="eyebrow">Your first insight</p><h2>There’s something underneath it.</h2><div><span className="insight-label">What you felt</span><p>{resultResource.data.feltText}</p></div><div><span className="insight-label">What you needed</span><p>{resultResource.data.needText}</p></div><p className="locked-line"><LockKeyhole size={16} aria-hidden="true" /><span>Your opening words are next.</span></p></section>}
+        <LockedPreview variant="guide" compact action={<a className="button button-secondary" href="#choose-plan">Choose your plan<ArrowRight size={17} /></a>} />
         <section className="plan-inclusions"><h2>Make room for both of you.</h2><p>Prepare on your own. Come back together with a clearer place to start.</p><ul><li><Check size={18} aria-hidden="true" /><span>Your complete preparation and personal conversation guide</span></li><li><Check size={18} aria-hidden="true" /><span>A free invitation for your partner to prepare privately</span></li><li><Check size={18} aria-hidden="true" /><span>Shared check-ins, your journal, and patterns over time</span></li></ul></section>
       </div>
-      <section className="plan-picker" aria-label="Choose a shared plan">
+      <section className="plan-picker" id="choose-plan" aria-label="Choose a shared plan">
         <div className="plan-picker-heading"><span className="plan-picker-icon"><UsersRound size={25} aria-hidden="true" /></span><div><h2>A little more understanding.</h2><p>One price for your couple.</p></div></div>
         <div className="plan-grid" role="radiogroup" aria-label="Choose your plan">{plans.map(plan => <label key={plan.plan} className={`plan ${selectedPlan === plan.plan ? 'selected' : ''}`}><input className="sr-only" type="radio" name="plan" value={plan.plan} checked={selectedPlan === plan.plan} disabled={operation.busy || Boolean(pending && plan.plan !== selectedPlan)} onChange={() => setSelected(plan.plan)} /><span className="plan-radio" aria-hidden="true">{selectedPlan === plan.plan && <Check size={13} />}</span><span className="plan-description"><span className="plan-heading">{planCopy[plan.plan]?.title || plan.plan}</span><span>{planCopy[plan.plan]?.description}</span></span><span className="plan-price">${plan.priceUsd}<small>{planCopy[plan.plan]?.period}</small></span></label>)}</div>
         {pending && <Notice>Your checkout is still open. Resume it to complete the selected plan.</Notice>}
