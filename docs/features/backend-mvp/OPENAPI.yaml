@@ -1254,6 +1254,8 @@ components:
       additionalProperties: false
       required:
       - coupleId
+      - partnerRole
+      - currentSessionId
       - inviteUrl
       - partnerBStatus
       - partnerBInviteSentAt
@@ -1263,6 +1265,14 @@ components:
       - createdAt
       properties:
         coupleId: *id001
+        partnerRole:
+          $ref: '#/components/schemas/PartnerRole'
+        currentSessionId:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          description: This owner's latest attempt in the current round, including completed, skipped or privately stopped attempts. Null if this owner has no attempt in that round; never another owner's ID.
         inviteUrl:
           type: string
           description: Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A.
@@ -1690,6 +1700,7 @@ components:
       additionalProperties: false
       required:
       - sessionId
+      - fightRecordId
       - neutralTopic
       - feltText
       - needText
@@ -1702,6 +1713,12 @@ components:
       - locked
       properties:
         sessionId: *id001
+        fightRecordId:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          description: Journal record for this session's exact round after both partners are ready; null before then. Remains the old record for an old session.
         neutralTopic:
           $ref: '#/components/schemas/FightTopic'
         feltText:

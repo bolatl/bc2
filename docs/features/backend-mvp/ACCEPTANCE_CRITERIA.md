@@ -51,3 +51,8 @@ Each criterion is independently observable with two cookie jars (A/B) and, where
 30. All nineteen business operations appear in OpenAPI, the prose contract, frontend types, and backend routing. Every mock response validates against its operation/status schema.
 31. Normal tests, race checks, vet, and contract validation complete successfully, or the exact environmental limitation is reported in the final handoff.
 32. Shutdown handles termination gracefully; a restart intentionally clears in-memory state.
+
+## Frontend recovery
+
+33. `/couples/me` returns the authenticated browser's `partnerRole` and own `currentSessionId`, including terminal attempts. B receives null when a new A round has started but B has not started a matching attempt. A skipped or safety-stopped B attempt is replaced by B's next own attempt without exposing that ID to A.
+34. A private result returns nullable `fightRecordId`. It is null before both partners are ready, identifies the same round for both partners, and remains tied to that round after newer rounds complete.

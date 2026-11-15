@@ -64,7 +64,17 @@ func (a *App) CoupleMe(actor model.Actor) (dto.CoupleResponse, error) {
 	return a.coupleResponse(c, actor), nil
 }
 func (a *App) coupleResponse(c model.Couple, actor model.Actor) dto.CoupleResponse {
-	out := dto.CoupleResponse{CoupleID: c.ID, PartnerBStatus: c.PartnerBStatus, PartnerBInviteSentAt: c.InviteSentAt, DefaultPlan: defaultPlan(c), CreatedAt: c.CreatedAt}
+	out := dto.CoupleResponse{CoupleID: c.ID, PartnerRole: actor.PartnerRole, PartnerBStatus: c.PartnerBStatus, PartnerBInviteSentAt: c.InviteSentAt, DefaultPlan: defaultPlan(c), CreatedAt: c.CreatedAt}
+	// Restore only this actor's own attempt in the current round. Completed,
+	// skipped and privately stopped attempts remain reloadable by their owner.
+	first, second := a.roundSessions(c.ID, c.CurrentRoundID)
+	current := first
+	if actor.PartnerRole == "B" {
+		current = second
+	}
+	if current != nil {
+		out.CurrentSessionID = cp(&current.ID)
+	}
 	if c.InviteEnabled && a.active(c.ID) && actor.PartnerRole == "A" {
 		out.InviteURL = a.Config.FrontendURL + "/invites/" + url.PathEscape(c.InviteToken)
 	}

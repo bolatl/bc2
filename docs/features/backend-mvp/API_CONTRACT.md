@@ -188,6 +188,8 @@ Fields in the following objects are required unless “No” appears in the requ
 | Field | Type | Required | Constraints / meaning |
 |---|---|---|---|
 | `coupleId` | string | Yes | minLength=1. Opaque server-generated identifier. Do not infer order or encode user data. |
+| `partnerRole` | [PartnerRole](#partnerrole) | Yes | Current browser's server-verified role. |
+| `currentSessionId` | string or null | Yes | Own latest attempt in the current round, including completed/skipped/stopped attempts. Null before this owner starts; never the other partner's ID. |
 | `inviteUrl` | string | Yes | Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A. |
 | `partnerBStatus` | [PartnerBStatus](#partnerbstatus) | Yes |  |
 | `partnerBInviteSentAt` | string or null | Yes | format=date-time. Time invitation became shareable in the current round; null before readiness; not delivery confirmation. |
@@ -342,6 +344,7 @@ Fields in the following objects are required unless “No” appears in the requ
 | Field | Type | Required | Constraints / meaning |
 |---|---|---|---|
 | `sessionId` | string | Yes | minLength=1. Opaque server-generated identifier. Do not infer order or encode user data. |
+| `fightRecordId` | string or null | Yes | Exact journal record for this session's round after both partners are ready. Null before then; old sessions retain their old record ID. |
 | `neutralTopic` | [FightTopic](#fighttopic) | Yes |  |
 | `feltText` | string | Yes | Private derived feeling summary. |
 | `needText` | string | Yes | Private derived need summary. |
