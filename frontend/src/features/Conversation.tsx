@@ -428,6 +428,7 @@ export function PaywallPage() {
         <p className="plan-shared-note"><LockKeyhole size={14} aria-hidden="true" />Your partner joins free. Their answers stay private.</p>
         {config.paymentMode === 'mock' && <p className="payment-mode-note">Simulated payment — no charge. No payment details are collected.</p>}
         {config.paymentMode === 'stripe_test' && <p className="payment-mode-note">Test payment. Use Stripe test payment details.</p>}
+        {config.paymentMode === 'disabled' && <p className="payment-mode-note">Full demo access — no payment needed.</p>}
       </section>
     </div>
     {id && <div className="paywall-skip">{skipConfirm ? <Notice><p>Skipping clears your private answers for this conversation.</p><div className="actions"><Button disabled={operation.busy} onClick={() => void skip()}>Skip this topic</Button><Button variant="text" onClick={() => setSkipConfirm(false)}>Cancel</Button></div></Notice> : <Button variant="text" disabled={operation.busy} onClick={() => setSkipConfirm(true)}>Skip this topic</Button>}</div>}

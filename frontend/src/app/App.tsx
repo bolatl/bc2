@@ -20,6 +20,10 @@ function Protected({ children }: { children: ReactNode }) {
 export function App() {
   const { couple } = useSession();
   const location = useLocation();
+  const paymentNote = config.paymentMode === 'disabled' ? 'Full demo access — no payment needed'
+    : config.paymentMode === 'mock' ? 'Simulated payment — no charge'
+    : config.paymentMode === 'stripe_test' ? 'Test payment' : null;
+  const modeNote = [config.llmMode === 'mock' ? 'Demo responses' : null, paymentNote].filter(Boolean).join(' · ');
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
   return <div className={`app-shell ${couple ? 'app-authenticated' : 'app-public'}`} data-partner={couple?.partnerRole || 'A'}>
     <SakuraBackdrop />
@@ -27,7 +31,7 @@ export function App() {
     <header className="site-header"><Link to={couple ? '/home' : '/'} className="brand" aria-label="Love Lab home"><BrandMark size={40} /><span>love lab</span></Link>
       {couple ? <><nav className="app-nav" aria-label="Main navigation"><NavLink to="/home"><HeartHandshake size={17} aria-hidden="true" />Your space</NavLink><NavLink to="/partner"><UsersRound size={17} aria-hidden="true" />Partner</NavLink><NavLink to="/journal"><BookOpen size={17} aria-hidden="true" />Journal</NavLink><NavLink to="/stats"><ChartNoAxesCombined size={17} aria-hidden="true" />Patterns</NavLink></nav><div className="header-account"><NavLink to="/profile" className="profile-link" aria-label="My profile"><span className="account-avatar">{couple.partnerRole}</span><span>My profile</span></NavLink><NavLink to="/settings" className="settings-link" aria-label="Settings"><Settings2 size={18} aria-hidden="true" /></NavLink></div></> : <><nav className="public-nav" aria-label="Main navigation"><a href="/#how-it-works">How it works</a><a href="/#questions">Questions</a></nav><Link className="header-cta" to="/onboarding">Start a conversation<ArrowUpRight size={16} aria-hidden="true" /></Link></>}
     </header>
-    {(config.llmMode === 'mock' || config.paymentMode === 'mock' || config.paymentMode === 'stripe_test') && <div className="mode-note">{[config.llmMode === 'mock' ? 'Demo responses' : null, config.paymentMode === 'mock' ? 'Simulated payment — no charge' : config.paymentMode === 'stripe_test' ? 'Test payment' : null].filter(Boolean).join(' · ')}</div>}
+    {modeNote && <div className="mode-note">{modeNote}</div>}
     <main id="main"><Routes>
       <Route path="/" element={<WelcomePage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
