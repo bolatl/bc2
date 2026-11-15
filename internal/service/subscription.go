@@ -78,10 +78,12 @@ func (a *App) SubscriptionMe(actor model.Actor) (dto.SubscriptionResponse, error
 	if err != nil {
 		return dto.SubscriptionResponse{}, err
 	}
-	s, ok := a.Subscriptions.Get(actor.CoupleID)
-	if !ok && a.Config.DisablePaywall {
+	// Report effective demo access even if an older checkout is still stored.
+	// Do not convert that checkout into a paid subscription or mutate its record.
+	if a.Config.DisablePaywall {
 		return dto.SubscriptionResponse{Plan: defaultPlan(c), Status: "active"}, nil
 	}
+	s, ok := a.Subscriptions.Get(actor.CoupleID)
 	if !ok {
 		return dto.SubscriptionResponse{Plan: defaultPlan(c), Status: "none"}, nil
 	}

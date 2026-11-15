@@ -1,0 +1,39 @@
+# Only application build inputs may enter the Docker context. In particular,
+# local environment files, snapshots, Git history and source documents stay out.
+**
+!Dockerfile
+!.dockerignore
+!go.mod
+!go.sum
+!cmd/**
+!internal/**
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/tsconfig.json
+!frontend/vite.config.ts
+!frontend/src/**
+!frontend/public/**
+
+# Defense in depth if a local secret or source document is put under src/public.
+**/.env
+**/.env.*
+**/credentials.json
+**/*.credentials.json
+**/service-account*.json
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.md
+**/*.pdf
+**/*_test.go
+**/*.log
+**/*.tmp
+**/data/**
+**/backups/**
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.dump
+**/*:Zone.Identifier
