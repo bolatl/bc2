@@ -121,8 +121,8 @@ test('checkpoint back rewinds its answer and skipping clears the private prepara
   if (currentTurn?.type !== 'checkpoint') throw new Error('Expected a new checkpoint after revising feelings');
   await expectCheckpoint(page, currentTurn);
   await expect(page.getByRole('region', { name: 'Your private checkpoint summary' })).toContainText('I felt worried');
-  await page.getByRole('button', { name: 'Skip this topic', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip this topic', exact: true }).first().click();
+  await page.getByRole('button', { name: 'End conversation', exact: true }).click();
+  await page.getByRole('button', { name: 'End conversation', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'We can leave this here.', exact: true })).toBeVisible();
   const skipped = await get<Fight>(page, `/fight-sessions/${id}`);
   expect(skipped.status).toBe('skipped');

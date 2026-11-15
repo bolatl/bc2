@@ -80,12 +80,15 @@ func (a *App) coupleResponse(c model.Couple, actor model.Actor) dto.CoupleRespon
 	out := dto.CoupleResponse{CoupleID: c.ID, PartnerRole: actor.PartnerRole, PartnerBStatus: c.PartnerBStatus, PartnerBInviteSentAt: c.InviteSentAt, DefaultPlan: defaultPlan(c), CreatedAt: c.CreatedAt}
 	if actor.PartnerRole == "A" {
 		out.PartnerName = c.ProfileA.PartnerName
+		out.OwnProfile = copyProfile(c.ProfileA)
 	} else if c.ProfileB != nil {
 		out.PartnerName = c.ProfileB.PartnerName
+		out.OwnProfile = copyProfile(*c.ProfileB)
 	}
 	// Restore only this actor's own attempt in the current round. Completed,
 	// skipped and privately stopped attempts remain reloadable by their owner.
 	first, second := a.roundSessions(c.ID, c.CurrentRoundID)
+	out.PartnerStatus = otherPreparationStatus(actor.PartnerRole, first, second)
 	current := first
 	if actor.PartnerRole == "B" {
 		current = second
@@ -101,6 +104,13 @@ func (a *App) coupleResponse(c model.Couple, actor model.Actor) dto.CoupleRespon
 	}
 	_, out.PersonalityDone = a.Personalities.Get(personalityKey(actor))
 	return out
+}
+
+func copyProfile(profile model.PartnerProfile) *model.PartnerProfile {
+	if profile.FightTopics != nil {
+		profile.FightTopics = append([]string{}, profile.FightTopics...)
+	}
+	return &profile
 }
 func (a *App) DeleteCouple(actor model.Actor) error {
 	a.mu.Lock()

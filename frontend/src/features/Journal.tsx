@@ -1,103 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, ArrowUpRight, BookOpen, Check, CircleHelp, Copy, Flower2, HeartHandshake, LockKeyhole, MessageCircle, MessageCircleHeart, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingUp, UserRound, UsersRound } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, BookOpen, Check, CircleHelp, Copy, Flower2, HeartHandshake, LockKeyhole, MessageCircle, RefreshCw, ShieldCheck, Sparkles, Trash2, UserRound } from 'lucide-react';
 import { api, ApiError, errorMessage } from '../api/client';
-import type { Couple, Fight, FightRecord, Journal, JournalEntry, Personality, Stats, Subscription } from '../api/types';
+import type { Couple, Fight, FightRecord, Journal, JournalEntry, ConversationList, ConversationSummary } from '../api/types';
 import { useSession } from '../app/session';
 import { Button, Loading, Notice, Page, Scale } from '../components/ui';
 import { LockedPreview } from '../components/LockedPreview';
 import { ConversationReflection } from '../components/ConversationReflection';
 import '../styles/journal.css';
+import '../styles/conversation-journal.css';
 
 export function topicName(topic: string) { return ({ money: 'Money', chores: 'Sharing the chores', kids: 'Parenting', family: 'Family', phone: 'Phone time', jealousy: 'Jealousy', closeness: 'Feeling close', plans_decisions: 'Plans and decisions', time_attention: 'Time and attention', other: 'Something on your mind' } as Record<string, string>)[topic] ?? topic; }
 function date(value: string) { return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
-function SpaceSwitch({ active }: { active: 'you' | 'partner' }) {
-  return <nav className="space-switch" aria-label="Personal and partner views"><Link to="/home" aria-current={active === 'you' ? 'page' : undefined}><UserRound size={16} />Your space</Link><Link to="/partner" aria-current={active === 'partner' ? 'page' : undefined}><UsersRound size={16} />Your partner</Link></nav>;
-}
-
 function partnerState(couple: Couple) {
-  if (couple.partnerRole === 'B') return couple.partnerBStatus === 'not_invited'
-    ? { title: 'Waiting for the next invitation', description: 'Your partner has not shared their next preparation yet.', ready: false }
-    : { title: 'Ready to talk', description: 'Your partner has finished their preparation for this conversation. Take the time you need for your own.', ready: true };
   return {
-    not_invited: { title: 'Invitation not ready yet', description: 'Finish your preparation to make an invitation available for your partner.', ready: false },
-    invited: { title: 'Ready to be invited', description: 'Your invitation is ready. Share it when you feel comfortable; your partner will prepare in their own space.', ready: false },
-    in_progress: { title: 'Preparing privately', description: 'Your partner has joined and is preparing their side. Their answers and personal summary stay private.', ready: false },
-    ready: { title: 'Ready to talk', description: 'Your partner has finished their preparation. You can bring your own words into the conversation together.', ready: true },
-  }[couple.partnerBStatus];
+    not_started: { title: 'Not ready yet', description: 'Your partner has not started preparing for this conversation.', ready: false },
+    in_progress: { title: 'Preparing privately', description: 'Your partner is taking time to prepare. Their answers stay private.', ready: false },
+    ready: { title: 'Ready to talk', description: 'Your partner has finished preparing for this conversation.', ready: true },
+  }[couple.partnerStatus];
 }
 
 function useCurrentPreparation() {
   const { couple } = useSession();
   return useQuery({ queryKey: ['home-fight', couple?.coupleId, couple?.partnerRole, couple?.currentSessionId], queryFn: ({ signal }) => api<Fight>(`/fight-sessions/${couple!.currentSessionId}`, undefined, { signal }), enabled: !!couple?.currentSessionId });
-}
-
-export function HomePage() {
-  const { couple, refresh } = useSession();
-  const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const request = useRef<AbortController | null>(null);
-  useEffect(() => () => request.current?.abort(), []);
-  const current = useCurrentPreparation();
-  const status = current.data?.status;
-  const completed = status === 'completed';
-  const waiting = completed && (couple?.partnerRole === 'B' || couple?.partnerBStatus !== 'ready');
-  const active = status === 'in_progress' || status === 'awaiting_payment';
-  const waitingForA = couple?.partnerRole === 'B' && !couple.currentSessionId && couple.partnerBStatus === 'not_invited';
-  async function start() {
-    if (busy || request.current) return;
-    const controller = new AbortController(); request.current = controller;
-    setBusy(true); setError('');
-    try {
-      const fight = await api<Fight>('/fight-sessions', {}, { signal: controller.signal });
-      await refresh();
-      if (!controller.signal.aborted) navigate(`/fight-sessions/${fight.sessionId}`);
-    } catch (reason) {
-      if (controller.signal.aborted) return;
-      if (reason instanceof ApiError && reason.status === 402) { navigate('/paywall'); return; }
-      try {
-        const found = await refresh();
-        if (found?.currentSessionId && found.currentSessionId !== couple?.currentSessionId) { navigate(`/fight-sessions/${found.currentSessionId}`); return; }
-      } catch { /* The original failure remains useful. */ }
-      setError(errorMessage(reason));
-    } finally { request.current = null; if (!controller.signal.aborted) setBusy(false); }
-  }
-  const ownStatus = couple?.currentSessionId && current.isPending ? 'Checking your preparation…' : current.error ? 'Unable to check' : completed ? 'Ready to talk' : active ? 'Preparing privately' : 'Ready when you are';
-  const partner = couple ? partnerState(couple) : null;
-  return <Page className="dashboard-page personal-space-page" layout="wide" eyebrow="A moment for you" title={active ? 'Continue at your own pace.' : completed ? 'Your words are ready.' : 'A little space to understand.'} description="Prepare privately. Find your words. Come back to each other.">
-    <SpaceSwitch active="you" />
-    <div className="personal-home-grid">
-      <div className="home-primary">
-        {waitingForA ? <div className="home-action home-action-waiting"><span className="feature-icon"><MessageCircleHeart size={28} /></span><p className="eyebrow">Your next conversation</p><h2>Give them a little room.</h2><p>Your partner is preparing for your next conversation. Your own preparation will be available when they are ready.</p><Button variant="secondary" onClick={() => void refresh().catch(() => undefined)}><RefreshCw size={17} />Check again</Button></div>
-          : couple?.currentSessionId && current.isPending ? <div className="dashboard-card"><Loading /></div>
-          : current.error ? <Notice kind="error">{errorMessage(current.error)} <Button variant="text" onClick={() => void current.refetch()}>Try again</Button></Notice>
-          : <div className="home-action">
-            <div className="home-action-top"><span className="feature-icon"><Flower2 size={30} strokeWidth={1.3} aria-hidden="true" /></span><span className="privacy-pill"><LockKeyhole size={13} />Only you</span></div>
-            <p className="eyebrow">Your private preparation</p>
-            <h2>{active ? 'Pick up your conversation' : completed ? 'Keep your first sentence close' : 'Start with what matters to you'}</h2>
-            <p>{active ? 'Your current step is waiting. Take a breath, and continue with what feels true for you.' : completed ? 'Revisit your personal guide before you talk. There is room for both of your perspectives.' : 'A few guided questions can help you understand what happened, what you felt, and what you need.'}</p>
-            <div className="actions">{active || completed ? <Link className="button button-primary" to={`/fight-sessions/${couple?.currentSessionId}${completed ? '/result' : ''}`}>{completed ? 'View your guide' : 'Continue conversation'}<ArrowRight size={18} /></Link> : <Button disabled={busy} onClick={() => void start()}>{busy ? 'Getting ready…' : 'Start a conversation'}<ArrowRight size={18} /></Button>}
-              {completed && !waiting && <Button disabled={busy} variant="text" onClick={() => void start()}>Start another conversation</Button>}
-            </div>
-          </div>}
-        {error && <Notice kind="error">{error}</Notice>}
-      </div>
-      <aside className="personal-pair-card dashboard-card">
-        <div className="personal-card-heading"><UsersRound size={21} /><h2>Where you both are</h2></div>
-        <div className="partner-status-row"><span className="person-badge person-you"><UserRound size={18} /></span><div><b>You</b><span>{ownStatus}</span></div>{completed && <Check size={17} className="ready-check" />}</div>
-        <div className="partner-status-row"><span className="person-badge person-partner"><UserRound size={18} /></span><div><b>Your partner</b><span>{partner?.title}</span></div>{partner?.ready && <Check size={17} className="ready-check" />}</div>
-        <p>You each have your own space. Only your readiness is shared.</p>
-        <Link className="text-link" to="/partner">View partner’s progress<ArrowUpRight size={16} /></Link>
-      </aside>
-    </div>
-    <div className="home-links personal-home-links">
-      <Link className="dashboard-link" to="/journal"><span className="feature-icon feature-icon-partner"><BookOpen size={24} strokeWidth={1.4} /></span><span><strong>Your shared journal</strong><span>Look back at your conversations and check in on how they felt.</span></span><ArrowUpRight size={20} /></Link>
-      <Link className="dashboard-link" to="/profile"><span className="feature-icon feature-icon-soft"><UserRound size={24} strokeWidth={1.4} /></span><span><strong>My profile</strong><span>{couple?.personalityDone ? 'Revisit your personal reflection, your plan, and privacy settings.' : 'Get to know your patterns, and manage your personal space.'}</span></span><ArrowUpRight size={20} /></Link>
-    </div>
-  </Page>;
 }
 
 export function PartnerPage() {
@@ -110,6 +37,7 @@ export function PartnerPage() {
   const refreshPreparation = current.refetch;
   const hasPreparation = Boolean(couple?.currentSessionId);
   useEffect(() => {
+    void refresh().catch(() => undefined);
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
         void Promise.all([refresh(), ...(hasPreparation ? [refreshPreparation({ throwOnError: true })] : [])]).catch(() => undefined);
@@ -131,47 +59,24 @@ export function PartnerPage() {
   }
   const partner = couple ? partnerState(couple) : null;
   const ownReady = current.data?.status === 'completed';
-  return <Page className="partner-space-page personal-space-page" layout="wide" eyebrow="Your shared space" title="Two perspectives. Room for both." description="See where your partner is, while giving each other space to prepare.">
-    <SpaceSwitch active="partner" />
+  return <Page className="partner-space-page personal-space-page" layout="wide" eyebrow="Partner" title="Your partner’s progress" description="Check their status for the current conversation. Their answers and personal reflection stay private.">
     <div className="partner-space-grid">
       <section className="partner-preparation-card dashboard-card">
-        <div className="partner-view-label"><span className="person-badge person-partner"><UserRound size={24} /></span><div><span className="eyebrow">Your partner</span><p>Preparation status</p></div><span className={`readiness-badge ${partner?.ready ? 'is-ready' : ''}`}>{partner?.ready ? <Check size={14} /> : <Flower2 size={15} />}{partner?.ready ? 'Ready' : 'In their own time'}</span></div>
+        <div className="partner-view-label"><span className="person-badge person-partner"><UserRound size={24} /></span><div><span className="eyebrow">Your partner</span><p>Preparation status</p></div><span className={`readiness-badge ${partner?.ready ? 'is-ready' : ''}`}>{partner?.ready ? <Check size={14} /> : <Flower2 size={15} />}{partner?.ready ? 'Ready' : 'Not ready'}</span></div>
         <h2>{partner?.title}</h2><p className="partner-state-description">{partner?.description}</p>
-        {couple?.partnerRole === 'A' && <ol className="partner-progress" aria-label="Your partner’s preparation progress">{['Invite ready', 'Preparing', 'Ready to talk'].map((label, index) => {
-          const reached = { not_invited: -1, invited: 0, in_progress: 1, ready: 2 }[couple.partnerBStatus];
+        {couple && <ol className="partner-progress" aria-label="Your partner’s preparation progress">{['Not started', 'Preparing', 'Ready to talk'].map((label, index) => {
+          const reached = { not_started: 0, in_progress: 1, ready: 2 }[couple.partnerStatus];
           return <li key={label} className={index <= reached ? 'reached' : ''} aria-current={index === reached ? 'step' : undefined}>{label}</li>;
         })}</ol>}
-        <div className="pair-readiness" aria-label="Both partners’ readiness"><div><span className={`person-badge person-you ${ownReady ? 'is-ready' : ''}`}>{ownReady ? <Check size={24} /> : <UserRound size={24} />}</span><strong>You</strong><span>{couple?.currentSessionId && current.isPending ? 'Checking…' : current.error ? 'Unable to check' : ownReady ? 'Ready to talk' : 'Your own preparation'}</span></div><span className="pair-readiness-connection" aria-hidden="true"><Flower2 size={21} /></span><div><span className={`person-badge person-partner ${partner?.ready ? 'is-ready' : ''}`}>{partner?.ready ? <Check size={24} /> : <UserRound size={24} />}</span><strong>Your partner</strong><span>{partner?.ready ? 'Ready to talk' : 'Not ready yet'}</span></div></div>
+        <div className="pair-readiness" aria-label="Both partners’ readiness"><div><span className={`person-badge person-you ${ownReady ? 'is-ready' : ''}`}>{ownReady ? <Check size={24} /> : <UserRound size={24} />}</span><strong>You</strong><span>{couple?.currentSessionId && current.isPending ? 'Checking…' : current.error ? 'Unable to check' : ownReady ? 'Ready to talk' : 'Your own preparation'}</span></div><span className="pair-readiness-connection" aria-hidden="true"><Flower2 size={21} /></span><div><span className={`person-badge person-partner ${partner?.ready ? 'is-ready' : ''}`}>{partner?.ready ? <Check size={24} /> : <UserRound size={24} />}</span><strong>{couple?.partnerName || 'Your partner'}</strong><span>{partner?.ready ? 'Ready to talk' : 'Not ready yet'}</span></div></div>
         <div className="actions">{couple?.partnerRole === 'A' && couple.inviteUrl && <Button onClick={() => void copy()}>{copied ? <Check size={17} /> : <Copy size={17} />}{copied ? 'Link copied' : 'Copy invite link'}</Button>}<Button variant="secondary" disabled={checking} onClick={() => void check()}><RefreshCw size={16} />{checking ? 'Checking…' : 'Refresh status'}</Button></div>
         {copyError && <label className="form-field invite-copy-field">Copy this link to share<input readOnly value={couple?.inviteUrl || ''} onFocus={event => event.currentTarget.select()} /></label>}
         {error && <Notice kind="error">{error}</Notice>}
       </section>
       <aside className="partner-space-aside">
         <section className="partner-privacy-card"><LockKeyhole size={22} strokeWidth={1.4} /><h2>A little privacy helps you be honest.</h2><p>This view shares readiness, not your partner’s answers, personality reflection, or personal summary.</p><Link className="text-link" to="/home">Return to your own space<ArrowUpRight size={16} /></Link></section>
-        <Link className="dashboard-link partner-journal-link" to="/journal"><BookOpen size={23} strokeWidth={1.4} /><span><strong>Your shared journal</strong><span>Once you have both prepared, your conversation appears here.</span></span><ArrowUpRight size={18} /></Link>
+        <Link className="dashboard-link partner-journal-link" to="/journal"><BookOpen size={23} strokeWidth={1.4} /><span><strong>Your conversations</strong><span>Continue your preparation or revisit a previous conversation.</span></span><ArrowUpRight size={18} /></Link>
       </aside>
-    </div>
-  </Page>;
-}
-
-export function ProfilePage() {
-  const { couple } = useSession();
-  const profile = useQuery({ queryKey: ['profile-reflection', couple?.coupleId, couple?.partnerRole], queryFn: ({ signal }) => api<Personality>('/personality-tests/me', undefined, { signal }), enabled: Boolean(couple?.personalityDone) });
-  const plan = useQuery({ queryKey: ['profile-subscription', couple?.coupleId, couple?.partnerRole], queryFn: ({ signal }) => api<Subscription>('/subscriptions/me', undefined, { signal }), enabled: Boolean(couple) });
-  const planTitles = { monthly: 'Monthly plan', yearly: 'Yearly plan', program: 'Couples program' };
-  const planStatus = plan.data?.status;
-  return <Page className="profile-page personal-space-page" layout="wide" eyebrow="My profile" title="Your space, made personal." description="Your reflection, your access, and the things you choose to keep.">
-    <div className="profile-workspace">
-      <aside className="profile-identity-card dashboard-card"><span className="profile-avatar"><UserRound size={34} strokeWidth={1.2} /></span><h2>You</h2><span className="profile-role">Partner {couple?.partnerRole}</span><p>Your private Kintsugi profile in this browser.</p><dl><div><dt>Shared space created</dt><dd>{couple ? date(couple.createdAt) : '—'}</dd></div><div><dt>Personal reflection</dt><dd>{couple?.personalityDone ? 'Completed' : 'Not started'}</dd></div></dl><Link className="text-link" to="/home">Your conversations<ArrowUpRight size={16} /></Link></aside>
-      <div className="profile-sections">
-        <section className="profile-reflection-card dashboard-card"><div className="personal-card-heading"><Sparkles size={22} strokeWidth={1.4} /><div><p className="eyebrow">Your personal reflection</p><h2>A little more self-understanding.</h2></div></div>
-          {couple?.personalityDone ? profile.isPending ? <Loading label="Opening your reflection…" /> : profile.error ? <Notice kind="error">{errorMessage(profile.error)}<Button variant="text" onClick={() => void profile.refetch()}>Try again</Button></Notice> : profile.data && <><p>From your reflection on {date(profile.data.completedAt)}. These are starting points for understanding yourself.</p><ul className="profile-strengths">{profile.data.strengths.map(strength => <li key={strength}><Flower2 size={16} /><span>{strength}</span></li>)}</ul><Link className="button button-secondary" to="/personality/result">View your full reflection<ArrowUpRight size={16} /></Link></> : <><p>Explore how you connect, react, and make room for each other with an optional 20-question reflection.</p><Link className="button button-secondary" to="/personality">Explore your patterns<ArrowRight size={17} /></Link></>}
-        </section>
-        <div className="profile-details-grid">
-          <section className="profile-plan-card dashboard-card"><span className="feature-icon feature-icon-partner"><HeartHandshake size={23} strokeWidth={1.4} /></span><h2>Your shared plan</h2>{plan.isPending ? <Loading label="Checking your plan…" /> : plan.error ? <Notice kind="error">{errorMessage(plan.error)}<Button variant="text" onClick={() => void plan.refetch()}>Try again</Button></Notice> : <><p className="profile-plan-status">{planStatus === 'active' ? 'Full access is active' : planStatus === 'pending' ? 'Checkout is waiting' : 'No active plan'}</p><p>{planStatus === 'active' ? `${plan.data?.activatedAt ? planTitles[plan.data.plan] + '. ' : ''}Your couple can access full preparations, your journal, and shared check-ins.` : planStatus === 'pending' ? 'Finish your existing checkout to open full access for both of you.' : 'One plan opens full preparations and your shared journal for both partners.'}</p>{planStatus !== 'active' && (couple?.partnerRole === 'A' ? <Link className="text-link" to="/paywall">{planStatus === 'pending' ? 'Resume checkout' : 'View plans'}<ArrowUpRight size={16} /></Link> : <p className="quiet">Your partner manages your couple’s plan.</p>)}</>}</section>
-          <section className="profile-settings-card dashboard-card"><span className="feature-icon feature-icon-soft"><ShieldCheck size={23} strokeWidth={1.4} /></span><h2>Privacy &amp; your data</h2><p>Your personal answers and reflection stay private from your partner. Keep this browser’s cookies to return to your profile.</p><Link className="text-link" to="/settings">Manage your data<ArrowUpRight size={16} /></Link></section>
-        </div>
-      </div>
     </div>
   </Page>;
 }
@@ -183,27 +88,102 @@ function AccessNotice({ error, retry, variant = 'journal' }: { error: unknown; r
 }
 
 export function JournalPage() {
-  const { couple } = useSession();
-  const query = useQuery({ queryKey: ['journal', couple?.coupleId, couple?.partnerRole], queryFn: ({ signal }) => api<Journal>('/journal', undefined, { signal }) });
-  const records = query.data ?? [];
-  const rated = records.filter(record => record.averageRating !== null);
-  return <Page className="journal-page" layout="wide" eyebrow="Your shared journal" title="Every conversation is a beginning." description="Keep a little perspective on what you’ve talked about, and how it felt.">
-    <div className="subnav"><span><BookOpen size={17} />Conversations</span><Link to="/stats"><TrendingUp size={17} />Patterns<ArrowUpRight size={15} /></Link></div>
-    {query.isPending ? <Loading /> : query.error ? <AccessNotice error={query.error} retry={() => void query.refetch()} /> : !records.length ? <div className="journal-empty dashboard-card"><span className="feature-icon feature-icon-partner"><BookOpen size={34} strokeWidth={1.5} /></span><h2>Your story starts with a conversation.</h2><p>Once you have both prepared, your conversation will appear here. Your private answers stay private.</p><Link className="button button-primary" to="/home">Go to your space<ArrowRight size={18} /></Link></div> : <>
-      <div className="journal-summary"><div><span>Conversations together</span><strong>{records.length}</strong></div><div><span>Shared check-ins</span><strong>{rated.length}</strong></div><div><span>Rated 8 or higher</span><strong>{rated.filter(record => record.averageRating! >= 8).length}</strong></div></div>
-      <div className="journal-workspace">
-        <div className="journal-list dashboard-card"><div className="journal-list-heading"><h2>Your conversations</h2><span>Most recent first</span></div>{[...records].reverse().map(record => <JournalRow key={record.id} record={record} />)}</div>
-        <aside className="journal-aside"><div className="dashboard-card journal-guide"><span className="feature-icon feature-icon-partner"><HeartHandshake size={24} /></span><h2>A shared view.</h2><p>Your journal brings both check-ins together. Each shared score is the average of your two ratings.</p><RatingLegend /><Link className="text-link" to="/stats">See your patterns<ArrowUpRight size={17} /></Link></div><div className="journal-privacy"><LockKeyhole size={17} /><p>Only the topic, dates, and check-ins are shared here. Your private preparation stays private.</p></div></aside>
+  const { couple, refresh } = useSession();
+  const navigate = useNavigate();
+  const cache = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => { void refresh().catch(() => undefined); }, [refresh]);
+  const query = useQuery({ queryKey: ['conversations', couple?.coupleId, couple?.partnerRole], queryFn: ({ signal }) => api<ConversationList>('/fight-sessions', undefined, { signal }), refetchInterval: 15_000 });
+  const shared = useQuery({ queryKey: ['journal', couple?.coupleId, couple?.partnerRole], queryFn: ({ signal }) => api<Journal>('/journal', undefined, { signal }), enabled: couple?.subscription?.status === 'active' || Boolean(query.data?.conversations.some(item => item.tier === 'full')), refetchInterval: 15_000 });
+  const conversations = query.data?.conversations ?? [];
+  const current = conversations.filter(item => item.isCurrent);
+  const previous = conversations.filter(item => !item.isCurrent);
+  const records = new Map((shared.data ?? []).map(record => [record.id, record]));
+  const canStart = query.data?.canStartNew ?? false;
+  const initiator = couple?.partnerRole === 'A';
+  const startHint = query.isPending ? 'Checking your current conversation…' : query.error ? 'Reload your conversations to start another.'
+    : !initiator ? canStart ? 'Your partner is ready. Take a few minutes to prepare privately.' : 'You can prepare when your partner’s next invitation is ready.'
+      : canStart ? 'A fresh partner link will be ready when you finish preparing. Previous invitation links expire when you start again.'
+        : current.some(item => item.status === 'in_progress' || item.status === 'awaiting_payment') ? 'Finish or close your current preparation before starting another conversation.'
+          : 'Your partner is still preparing. You can start a new conversation when they’re ready.';
+
+  async function start() {
+    if (request.current || !canStart) return;
+    const controller = new AbortController(); request.current = controller;
+    const previousId = couple?.currentSessionId;
+    setBusy(true); setError('');
+    try {
+      const fight = await api<Fight>('/fight-sessions', {}, { signal: controller.signal });
+      await refresh();
+      await cache.invalidateQueries({ queryKey: ['conversations'] });
+      if (!controller.signal.aborted) navigate(`/fight-sessions/${fight.sessionId}`);
+    } catch (reason) {
+      if (controller.signal.aborted) return;
+      if (reason instanceof ApiError && reason.status === 402) { navigate('/paywall'); return; }
+      try {
+        const found = await refresh();
+        if (!controller.signal.aborted && found?.currentSessionId && found.currentSessionId !== previousId) {
+          navigate(`/fight-sessions/${found.currentSessionId}`); return;
+        }
+      } catch { /* Keep the original error and allow a safe retry. */ }
+      if (!controller.signal.aborted) { setError(errorMessage(reason)); void query.refetch(); }
+    } finally { request.current = null; if (!controller.signal.aborted) setBusy(false); }
+  }
+
+  return <Page className="journal-page conversation-journal" layout="wide" eyebrow="Journal" title="Your conversations" description="Continue where you left off, look back at a previous conversation, or start something new.">
+    <div className="journal-toolbar">
+      <div><Button disabled={!canStart || busy} onClick={() => void start()}><MessageCircle size={18} />{busy ? 'Getting ready…' : initiator ? 'New conversation' : 'Prepare your side'}<ArrowRight size={18} /></Button>
+        <p className="quiet">{startHint}</p>
       </div>
+      {couple?.subscription?.status === 'active' && <span className="journal-plan-note"><Check size={16} />Your plan covers new conversations.</span>}
+    </div>
+    {error && <Notice kind="error">{error}</Notice>}
+    {query.isPending ? <Loading label="Opening your conversations…" /> : query.error ? <Notice kind="error">{errorMessage(query.error)}<Button variant="text" onClick={() => void query.refetch()}>Try again</Button></Notice> : <>
+      <section className="journal-conversation-section" aria-labelledby="current-conversation-heading"><div className="journal-section-heading"><h2 id="current-conversation-heading">Current conversation</h2><Link className="text-link" to="/partner">Partner’s status<ArrowUpRight size={16} /></Link></div>
+        {current.length ? current.map(item => <ConversationRow key={item.sessionId} conversation={item} record={item.fightRecordId ? records.get(item.fightRecordId) : undefined} />)
+          : <div className="journal-empty dashboard-card"><BookOpen size={30} /><h3>{canStart && !initiator ? 'Your partner is ready to talk.' : 'No conversation in progress.'}</h3><p>{canStart ? 'Use the button above when you’re ready to begin.' : 'Your next conversation will appear here.'}</p></div>}
+      </section>
+      <section className="journal-conversation-section" aria-labelledby="previous-conversations-heading"><div className="journal-section-heading"><h2 id="previous-conversations-heading">Previous conversations</h2><span className="quiet">Most recent first</span></div>
+        {previous.length ? previous.map(item => <ConversationRow key={item.sessionId} conversation={item} record={item.fightRecordId ? records.get(item.fightRecordId) : undefined} />) : <p className="journal-no-history">Your earlier conversations will stay here as you start new ones.</p>}
+      </section>
+      {shared.error && !(shared.error instanceof ApiError && shared.error.status === 402) && <Notice kind="error">Your conversations are available, but shared check-ins could not load.<Button variant="text" onClick={() => void shared.refetch()}>Retry check-ins</Button></Notice>}
+      <p className="journal-privacy"><LockKeyhole size={17} />Your preparation and personal summaries stay private. Only the topic and shared check-ins are visible to both of you.</p>
     </>}
   </Page>;
 }
-function RatingLegend() {
-  return <div className="rating-legend" aria-label="Shared rating colors"><span><i className="status-dot green" />8–10</span><span><i className="status-dot yellow" />5–7.5</span><span><i className="status-dot red" />1–4.5</span><span><i className="status-dot gray" />No shared rating</span></div>;
-}
-function JournalRow({ record }: { record: FightRecord }) {
-  const status = record.status === 'not_discussed' ? 'Not talked yet' : record.status === 'pending' ? 'Waiting for both check-ins' : 'Both checked in';
-  return <article className="journal-row"><span className={`journal-topic-icon rating-${record.color}`}><MessageCircle size={20} /></span><div className="journal-row-copy"><p className="quiet">{date(record.startedAt)}</p><h2>{topicName(record.topic)}</h2><Link className="text-link journal-summary-link" to={`/journal/${record.id}`}>View your summary<ArrowUpRight size={16} /></Link><p className="record-status"><span className={`status-dot ${record.color}`} />{status}</p>{record.divergenceFlag && <p className="divergence-note">You see this one differently — worth a short check-in.</p>}</div><div className="journal-rating">{record.averageRating !== null ? <span className={`rating-value rating-${record.color}`}><strong>{record.averageRating}</strong><small> / 10 together</small></span> : <span className="quiet">No shared rating yet</span>}<Link className="text-link" to={`/journal/${record.id}/rating`}>Check in<ArrowUpRight size={17} /></Link></div></article>;
+
+function ConversationRow({ conversation, record }: { conversation: ConversationSummary; record?: FightRecord }) {
+  const { couple } = useSession();
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const active = conversation.status === 'in_progress' || conversation.status === 'awaiting_payment';
+  const completed = conversation.status === 'completed';
+  const status = completed ? 'Ready to talk' : active ? 'Preparing' : 'Closed';
+  const partnerStatus = { not_started: 'Not ready yet', in_progress: 'Preparing', ready: 'Ready to talk' }[conversation.partnerStatus];
+  const href = completed && conversation.resultAvailable
+    ? conversation.fightRecordId ? `/journal/${conversation.fightRecordId}` : `/fight-sessions/${conversation.sessionId}/result`
+    : `/fight-sessions/${conversation.sessionId}`;
+  async function copy() {
+    try { await navigator.clipboard.writeText(conversation.inviteUrl); setCopied(true); setCopyError(false); }
+    catch { setCopyError(true); }
+  }
+  return <article className={`journal-row conversation-row ${conversation.isCurrent ? 'is-current' : ''}`} data-session-id={conversation.sessionId}>
+    <span className={`journal-topic-icon rating-${record?.color ?? 'gray'}`}><MessageCircle size={22} /></span>
+    <div className="journal-row-copy"><p className="quiet">{date(conversation.createdAt)}</p><h3>{conversation.neutralTopic ? topicName(conversation.neutralTopic) : 'New conversation'}</h3>
+      <div className="conversation-statuses"><span className={completed ? 'is-ready' : ''}>You: {status}</span><span>Partner: {partnerStatus}</span></div>
+      {record && <p className="record-status"><span className={`status-dot ${record.color}`} />{record.status === 'not_discussed' ? 'Not talked yet' : record.status === 'pending' ? 'Waiting for both check-ins' : 'Both checked in'}{record.averageRating !== null && <strong className={`rating-${record.color}`}> · {record.averageRating} / 10 together</strong>}</p>}
+      {record?.divergenceFlag && <p className="divergence-note">Your ratings differ. Make a little time to check in.</p>}
+      <div className="actions"><Link className="button button-secondary journal-summary-link" to={href}>{active ? 'Continue conversation' : completed ? 'View your summary' : 'View conversation'}<ArrowUpRight size={16} /></Link>
+        {conversation.inviteUrl && <Button variant="text" onClick={() => void copy()}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Link copied' : 'Copy invite link'}</Button>}
+        {record?.bothReadyAt && <Link className="text-link" to={`/journal/${record.id}/rating`}>Check in<ArrowUpRight size={16} /></Link>}
+      </div>
+      {copyError && <label className="form-field invite-copy-field">Copy this link to share<input readOnly value={conversation.inviteUrl} onFocus={event => event.currentTarget.select()} /></label>}
+      {conversation.isCurrent && active && couple?.partnerRole === 'A' && <p className="quiet conversation-invite-note">Your partner link becomes available after you finish preparing.</p>}
+    </div>
+  </article>;
 }
 
 export function JournalEntryPage() {
@@ -242,7 +222,7 @@ export function JournalEntryPage() {
           <p className="eyebrow">Shared details</p><h2>{topicName(entry.topic)}</h2>
           <dl><div><dt>Started</dt><dd>{date(entry.startedAt)}</dd></div><div><dt>Both ready</dt><dd>{entry.bothReadyAt ? date(entry.bothReadyAt) : 'Not yet'}</dd></div><div><dt>Your check-in</dt><dd>{(couple?.partnerRole === 'A' ? entry.ratingA : entry.ratingB) ?? 'Not rated'}</dd></div><div><dt>Partner’s check-in</dt><dd>{(couple?.partnerRole === 'A' ? entry.ratingB : entry.ratingA) ?? 'Not rated'}</dd></div><div><dt>Shared rating</dt><dd>{entry.averageRating === null ? 'Not rated' : `${entry.averageRating} / 10`}</dd></div></dl>
           {entry.divergenceFlag && <p className="journal-entry-divergence">Your ratings differ. It may help to check in about how each of you felt.</p>}
-          <Link className="button button-primary" to={`/journal/${entry.id}/rating`}>Check in<ArrowRight size={18} /></Link>
+          {entry.bothReadyAt ? <Link className="button button-primary" to={`/journal/${entry.id}/rating`}>Check in<ArrowRight size={18} /></Link> : <p className="quiet">Check-ins open when you have both finished preparing.</p>}
         </section>
         {result && result.thermometerStart !== null && <section className="thermometer-result"><h2>Your intensity check-in</h2>{result.thermometerEnd !== null
           ? <><div className="thermometer-comparison"><div><strong>{result.thermometerStart}</strong><span>Before</span></div><ArrowRight size={24} aria-hidden="true" /><div><strong>{result.thermometerEnd}</strong><span>After</span></div></div><p>Before and after preparing, on a scale of 1–10.</p></>
@@ -280,33 +260,6 @@ export function RatingPage() {
   return <Page className="rating-page" eyebrow="Your check-in" title="How did the conversation feel?" description={record ? `${topicName(record.topic)} · ${date(record.startedAt)}` : 'Reflect on how it went for you.'} aside={<div className="rating-aside"><span className="feature-icon feature-icon-partner"><HeartHandshake size={27} /></span><h2>It’s a check-in, not a scorecard.</h2><p>There’s no right answer. Notice how you felt, and leave room for your partner to feel differently.</p><Link className="text-link" to="/journal">Back to your journal<ArrowUpRight size={17} /></Link></div>}>
     {query.isPending ? <Loading /> : query.error ? <AccessNotice error={query.error} retry={() => void query.refetch()} /> : !record ? <Notice>This conversation is unavailable.<Link to="/journal">Return to journal</Link></Notice> : <div className="rating-content"><span className="privacy-pill"><UserRound size={14} />Your experience</span><p>Your rating reflects your experience. Your partner can add theirs separately.</p><Scale value={rating} onChange={setRating} disabled={busy} tone="rating" /><div className="scale-labels"><span>Still felt difficult</span><span>Felt understood</span></div>{error && <Notice kind="error">{error}</Notice>}<div className="rating-actions"><Button disabled={busy || rating === null} onClick={() => void save(rating)}>{busy ? 'Saving…' : 'Save rating'}<ArrowRight size={18} /></Button><Button disabled={busy} variant="secondary" onClick={() => void save(null)}>We haven’t talked yet</Button></div><div className="rating-help"><CircleHelp size={17} /><span>You can come back and change your check-in later.</span></div></div>}
   </Page>;
-}
-
-export function StatsPage() {
-  const { couple } = useSession();
-  const query = useQuery({ queryKey: ['stats', couple?.coupleId, couple?.partnerRole], queryFn: ({ signal }) => api<Stats>('/journal/stats', undefined, { signal }) });
-  const data = query.data;
-  return <Page className="patterns-page" layout="wide" eyebrow="Your patterns" title="A little perspective over time." description="Some things get easier to understand when you look at them together.">
-    <div className="subnav"><Link to="/journal"><BookOpen size={17} />Conversations</Link><span><TrendingUp size={17} />Patterns</span></div>
-    {query.isPending ? <Loading /> : query.error ? <AccessNotice error={query.error} retry={() => void query.refetch()} variant="patterns" /> : data && data.totalFights === 0 ? <div className="journal-empty dashboard-card"><span className="feature-icon feature-icon-partner"><TrendingUp size={30} /></span><h2>There’s no pattern to show just yet.</h2><p>After you both prepare for a conversation, you’ll start to see your shared history here.</p><Link className="button button-primary" to="/home">Back to your space<ArrowRight size={18} /></Link></div> : data && <>
-      <div className="patterns-grid">
-        <div className="patterns-overview"><div className="stat-line"><span className="feature-icon"><MessageCircleHeart size={25} /></span><strong>{data.totalFights}</strong><span>conversations<br />in your journal</span><p>Each one is a chance to understand each other a little better.</p></div>
-          {data.recurringTopicHint && <div className="recurring-topic"><span className="eyebrow">A recurring topic</span><h2>{topicName(data.recurringTopicHint)}</h2><p>This has come up in several conversations. It may be worth making a little time for it.</p><Link className="text-link" to="/home">Return to your space<ArrowUpRight size={16} /></Link></div>}
-        </div>
-        <section className="patterns-trend dashboard-card"><div className="card-heading"><span className="feature-icon feature-icon-partner"><TrendingUp size={22} /></span><div><h2>How conversations have felt</h2><p>Your shared ratings, in conversation order.</p></div></div>{!data.averageRatingTrend.length ? <div className="chart-empty"><p>Your trend will appear after you both add a numeric rating.</p><Link className="text-link" to="/journal">Add your check-in<ArrowUpRight size={16} /></Link></div> : <><RatingTrend ratings={data.averageRatingTrend} /><RatingLegend /><p className="chart-caption">Average ratings, in conversation order: {data.averageRatingTrend.join(' · ')} / 10</p></>}</section>
-        <section className="patterns-topics dashboard-card"><div className="card-heading"><span className="feature-icon feature-icon-soft"><MessageCircle size={22} /></span><div><h2>What’s been on your minds</h2><p>The topics in your shared journal.</p></div></div><div className="topic-bars">{Object.entries(data.topicCounts).sort((a,b) => b[1]-a[1]).map(([topic, count]) => <div key={topic}><div className="bar-label"><span>{topicName(topic)}</span><span>{count} {count === 1 ? 'conversation' : 'conversations'}</span></div><div className="bar-track"><div style={{ width: `${count / data.totalFights * 100}%` }} /></div></div>)}</div></section>
-      </div>
-    </>}
-  </Page>;
-}
-function RatingTrend({ ratings }: { ratings: number[] }) {
-  const x = (i: number) => ratings.length === 1 ? 316 : 40 + i / (ratings.length - 1) * 550;
-  const y = (value: number) => 178 - (value - 1) / 9 * 155;
-  return <svg className="trend-chart" viewBox="0 0 620 205" role="img" aria-label={`Average ratings in order: ${ratings.join(', ')}`}>
-    {[1, 5, 8, 10].map(value => <g key={value}><line x1="40" x2="590" y1={y(value)} y2={y(value)} className="chart-gridline" /><text x="16" y={y(value) + 4} className="chart-label">{value}</text></g>)}
-    <polyline points={ratings.map((value, i) => `${x(i)},${y(value)}`).join(' ')} fill="none" className="chart-line" strokeWidth="2.5" strokeLinejoin="round" />
-    {ratings.map((value, i) => <circle key={i} cx={x(i)} cy={y(value)} r="5.5" className={`chart-point ${value >= 8 ? 'green' : value >= 5 ? 'yellow' : 'red'}`}><title>Shared rating {i + 1}: {value} out of 10</title></circle>)}
-  </svg>;
 }
 
 export function SettingsPage() {

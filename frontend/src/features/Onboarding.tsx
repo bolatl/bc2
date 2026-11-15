@@ -89,7 +89,6 @@ export function WelcomePage() {
     <section className="welcome-faq" id="questions" aria-labelledby="faq-heading"><div><p className="eyebrow">Before you begin</p><h2 id="faq-heading">A few things<br />you might wonder.</h2></div><div className="welcome-faq-list">
       <details><summary>Does my partner need an account?<ChevronDown size={18} aria-hidden="true" /></summary><p>No. Share your invitation once your preparation is complete and your plan is active. Your partner opens it in their own browser, answers three questions, and prepares privately.</p></details>
       <details><summary>Will my partner see what I write?<ChevronDown size={18} aria-hidden="true" /></summary><p>Your answers and personal guide are private. The shared journal contains the conversation topic, dates, and check-ins.</p></details>
-      <details><summary>Is Kintsugi therapy?<ChevronDown size={18} aria-hidden="true" /></summary><p>Kintsugi is an AI-powered educational tool for preparing a conversation. It is not therapy or a substitute for professional care.</p></details>
     </div></section>
   </div>;
 }
@@ -319,7 +318,7 @@ export function PersonalityResultPage() {
       <section className="profile-report-card profile-report-strengths"><span className="report-icon"><Sparkles size={24} aria-hidden="true" /></span><h2>What you bring</h2><p className="profile-report-intro">Strengths to keep close in a difficult moment.</p><ul className="insight-list">{query.data.strengths.map((text, index) => <li key={index}><Check size={19} aria-hidden="true" /><span>{text}</span></li>)}</ul></section>
       <section className="profile-report-card"><span className="report-icon"><Lightbulb size={24} aria-hidden="true" /></span><h2>Something to try</h2><p className="profile-report-intro">Small adjustments can make room for each other.</p><ol className="numbered-list">{query.data.tips.map((text, index) => <li key={index}>{text}</li>)}</ol></section>
     </div>
-    <div className="profile-report-footer"><div className="actions"><Link to="/choose" className="button button-primary">Continue<ArrowRight size={18} aria-hidden="true" /></Link><Link to="/home" className="text-link">Back to home</Link></div><p className="quiet">This is a reflection tool, not a diagnosis or a label.</p></div>
+    <div className="profile-report-footer"><div className="actions"><Link to="/home#patterns" className="button button-primary">See my patterns<ArrowRight size={18} aria-hidden="true" /></Link><Link to="/journal" className="text-link">Go to journal</Link></div></div>
   </Page>;
 }
 

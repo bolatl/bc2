@@ -331,9 +331,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/v1/fight-sessions:
+    get:
+      operationId: listConversations
+      summary: List the caller's current and previous private preparations
+      description: Available without a subscription. Lists only the authenticated person's metadata, never the other partner's answers, result or profile. Current invitations are returned only to A after readiness. Older links expire when A starts a new round.
+      tags:
+      - fight-sessions
+      responses:
+        '200':
+          description: Caller-owned conversations, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationListResponse'
+        '401':
+          description: Anonymous session missing, invalid, or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       operationId: createFightSession
       summary: Start a private session in the current round
+      description: A may start another round after finishing their preparation when B has not started or is ready. A partner still preparing is never interrupted. Each new round gets a fresh invitation token; old invitation links expire. An existing active couple subscription applies automatically.
       tags:
       - fight-sessions
       responses:
@@ -1247,6 +1267,10 @@ components:
       - invited
       - in_progress
       - ready
+    PartnerPreparationStatus:
+      type: string
+      enum: [not_started, in_progress, ready]
+      description: The other person's preparation status for this round. Private skips and safety stops are not distinguished from in_progress.
     FightStage:
       type: string
       enum:
@@ -1378,12 +1402,42 @@ components:
           - 'null'
           description: RFC 3339 timestamp in UTC.
           format: date-time
+    OwnProfile:
+      type: object
+      additionalProperties: false
+      description: Only the caller's saved onboarding information. Missing optional answers remain empty strings or null; no demographic values are inferred. This does not contain the other person's profile.
+      required: [age, relationshipStatus, togetherDuration, hasKids, conflictStyle, repairNeed, fightTopics, goal]
+      properties:
+        partnerName:
+          type: string
+        source:
+          type: string
+        age:
+          type: string
+        relationshipStatus:
+          type: string
+        togetherDuration:
+          type: string
+        hasKids:
+          type: string
+        conflictStyle:
+          type: string
+        repairNeed:
+          type: string
+        fightTopics:
+          type: [array, 'null']
+          items:
+            $ref: '#/components/schemas/FightTopic'
+        goal:
+          type: string
     CoupleResponse:
       type: object
       additionalProperties: false
       required:
       - coupleId
       - partnerRole
+      - ownProfile
+      - partnerStatus
       - currentSessionId
       - inviteUrl
       - partnerBStatus
@@ -1400,6 +1454,12 @@ components:
           type: string
           maxLength: 20
           description: Partner name provided by this caller during onboarding. Omitted if unknown; never copied from the other partner's private profile.
+        ownProfile:
+          anyOf:
+          - $ref: '#/components/schemas/OwnProfile'
+          - type: 'null'
+        partnerStatus:
+          $ref: '#/components/schemas/PartnerPreparationStatus'
         currentSessionId:
           type:
           - string
@@ -1408,7 +1468,7 @@ components:
           description: This owner's latest attempt in the current round, including completed, skipped or privately stopped attempts. Null if this owner has no attempt in that round; never another owner's ID.
         inviteUrl:
           type: string
-          description: Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A.
+          description: Empty until paid and A is ready; then an absolute frontend invitation URL unique to the current round. Returned only to A. Starting a new round expires previous links.
         partnerBStatus:
           $ref: '#/components/schemas/PartnerBStatus'
         partnerBInviteSentAt:
@@ -1798,6 +1858,52 @@ components:
           $ref: '#/components/schemas/AnswerSource'
         answerText:
           type: string
+    ConversationListResponse:
+      type: object
+      additionalProperties: false
+      required: [conversations, canStartNew]
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationSummary'
+        canStartNew:
+          type: boolean
+          description: Whether the current round allows this person to start a preparation. This is not a subscription entitlement; POST still checks payment. A starts a new round, while B joins the current ready round.
+    ConversationSummary:
+      type: object
+      additionalProperties: false
+      required: [sessionId, status, tier, stage, neutralTopic, createdAt, completedAt, isCurrent, resultAvailable, fightRecordId, partnerStatus, inviteUrl]
+      properties:
+        sessionId: *id001
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        tier:
+          $ref: '#/components/schemas/SessionTier'
+        stage:
+          $ref: '#/components/schemas/FightStage'
+        neutralTopic:
+          anyOf:
+          - $ref: '#/components/schemas/FightTopic'
+          - type: 'null'
+        createdAt: *id002
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+        isCurrent:
+          type: boolean
+          description: The caller's latest attempt in the current round.
+        resultAvailable:
+          type: boolean
+          description: A private result or free preview exists for this owned session. Use status to distinguish completed results from unfinished preparation.
+        fightRecordId:
+          type: [string, 'null']
+          description: Corresponding shared journal record, if created. Check-in access still requires a plan and both partners ready.
+        partnerStatus:
+          $ref: '#/components/schemas/PartnerPreparationStatus'
+        inviteUrl:
+          type: string
+          description: Current ready A invitation only; otherwise empty. Never a link to another round or another person's private preparation.
     FightSessionResponse:
       type: object
       additionalProperties: false

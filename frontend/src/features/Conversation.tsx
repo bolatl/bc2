@@ -11,6 +11,7 @@ import { SakuraJourney } from '../components/SakuraJourney';
 import { config } from '../config';
 import { clearCheckout, fallbackPlans, planCopy, readCheckout, saveCheckout } from './checkout-state';
 import { useSpeechToText } from '../hooks/useSpeechToText';
+import { useQuestionMotion } from '../hooks/useQuestionMotion';
 import '../styles/conversation.css';
 import '../styles/prototype-flow.css';
 
@@ -71,7 +72,7 @@ function useResource<T>(path: string | null) {
   const [loading, setLoading] = useState(Boolean(path));
   const request = useRef<AbortController | null>(null);
   const alive = useRef(true);
-  const load = useCallback(async (quiet = false): Promise<T | null> => {
+  const load = useCallback(async (quiet = false, beforeUpdate?: (value: T) => Promise<void>): Promise<T | null> => {
     if (!path) { setLoading(false); return null; }
     request.current?.abort();
     const controller = new AbortController();
@@ -79,6 +80,8 @@ function useResource<T>(path: string | null) {
     if (!quiet) setLoading(true);
     try {
       const value = await api<T>(path, undefined, { signal: controller.signal });
+      if (!alive.current || controller.signal.aborted) return null;
+      await beforeUpdate?.(value);
       if (!alive.current || controller.signal.aborted) return null;
       setData(value); setError(null);
       return value;
@@ -114,14 +117,6 @@ function useOperation() {
   return { busy, setBusy, slow, inFlight, controller };
 }
 
-function ProcessingNote() {
-  return <p className="privacy-note processing-note"><ShieldCheck size={17} aria-hidden="true" /><span>{config.llmMode === 'mock'
-    ? 'This version uses demo responses. Your private answers are not sent to an external AI provider.'
-    : config.llmMode === 'openai' || config.llmMode === 'anthropic'
-      ? 'Your answers and selected profile details are sent to our AI provider to prepare your questions and personal summary. Your partner cannot see your private answers.'
-      : 'Your answers and selected profile details may be sent to an external AI provider. Your partner cannot see your private answers.'}</span></p>;
-}
-
 export function FightPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
@@ -139,6 +134,16 @@ export function FightPage() {
   const current = fight?.currentTurn;
   const question = current?.type === 'next_turn' ? current : null;
   const locked = operation.busy || needsCheck;
+  const motion = useQuestionMotion(fight ? `${id}:${fightStep(fight)}` : undefined);
+  const motionDirection = useRef<'forward' | 'backward'>('forward');
+
+  async function prepareFight(next: Fight) {
+    if (!fight || fightStep(next) === fightStep(fight)) return;
+    if (next.currentTurn?.type === 'next_turn' || next.currentTurn?.type === 'checkpoint') {
+      await motion.leave(`${id}:${fightStep(next)}`, motionDirection.current);
+    }
+    if (alive.current) { setDraft(''); setScore(null); setSelected(null); }
+  }
 
   useEffect(() => {
     if (!fight) return;
@@ -157,7 +162,7 @@ export function FightPage() {
     if (operation.inFlight.current) return;
     operation.inFlight.current = true; operation.setBusy(true);
     const before = fight ? fightStep(fight) : null;
-    const fresh = await load(true);
+    const fresh = await load(true, prepareFight);
     if (alive.current) {
       if (fresh) {
         setNeedsCheck(false);
@@ -172,13 +177,15 @@ export function FightPage() {
 
   async function mutate(action: 'turns' | 'back' | 'skip-topic' | 'checkpoint', body: unknown) {
     if (operation.inFlight.current || !fight || locked) return;
+    motionDirection.current = action === 'back' ? 'backward' : 'forward';
     operation.inFlight.current = true; operation.setBusy(true); setMessage(null); setConfirm(null);
     const previousStep = fightStep(fight);
     try {
       const response = await api<TurnResponse | Fight>(`/fight-sessions/${encodeURIComponent(id)}/${action}`, body, { signal: operation.controller.current.signal });
       if (!alive.current) return;
-      setDraft(''); setScore(null); setSelected(null);
       if ('sessionId' in response) {
+        await prepareFight(response);
+        if (!alive.current) return;
         setData(response); setNeedsCheck(false);
       } else if (response.type === 'completed') {
         setData(null); void refresh().catch(() => undefined);
@@ -190,13 +197,13 @@ export function FightPage() {
         setData({ ...fight, status: 'stopped_safety', turns: [], currentTurn: response });
       } else {
         setNeedsCheck(true);
-        const fresh = await load(true);
+        const fresh = await load(true, prepareFight);
         if (alive.current && fresh) setNeedsCheck(false);
       }
     } catch (e) {
       if (!alive.current || operation.controller.current.signal.aborted) return;
       setMessage(errorText(e)); setNeedsCheck(true);
-      const fresh = await load(true);
+      const fresh = await load(true, prepareFight);
       if (alive.current && fresh) {
         setNeedsCheck(false);
         if (fightStep(fresh) !== previousStep) {
@@ -229,11 +236,11 @@ export function FightPage() {
   </>;
   const navigation = <>
     <div aria-live="polite" className="request-status">{operation.busy && <><ConversationPulse /><span>{operation.slow ? 'This is taking longer than usual.' : question?.stage === 'ready' ? 'Preparing your summary…' : 'Preparing the next step…'}</span></>}</div>
-    {confirm && <Notice><p>{confirm === 'back' ? 'Going back clears your previous answer and anything after it.' : 'Skipping this topic clears your private answers for this conversation.'}</p><div className="actions"><Button disabled={locked} onClick={() => void mutate(confirm === 'back' ? 'back' : 'skip-topic', confirm === 'back' ? { turnIndex: fight.turns[fight.turns.length - 1].turnIndex } : {})}>{confirm === 'back' ? 'Go back' : 'Skip this topic'}</Button><Button variant="text" onClick={() => setConfirm(null)}>Cancel</Button></div></Notice>}
-    <div className="conversation-navigation"><Button variant="text" disabled={locked || !fight.turns.length} onClick={() => setConfirm('back')}><ArrowLeft size={16} aria-hidden="true" />Back</Button><Button variant="text" disabled={locked} onClick={() => setConfirm('skip')}>Skip this topic</Button></div>
+    {confirm && <Notice><p>{confirm === 'back' ? 'Going back clears your previous answer and anything after it.' : 'Ending this conversation clears your private answers.'}</p><div className="actions"><Button disabled={locked} onClick={() => void mutate(confirm === 'back' ? 'back' : 'skip-topic', confirm === 'back' ? { turnIndex: fight.turns[fight.turns.length - 1].turnIndex } : {})}>{confirm === 'back' ? 'Go back' : 'End conversation'}</Button><Button variant="text" onClick={() => setConfirm(null)}>Cancel</Button></div></Notice>}
+    <div className="conversation-navigation"><Button variant="text" disabled={locked || !fight.turns.length} onClick={() => setConfirm('back')}><ArrowLeft size={16} aria-hidden="true" />Back</Button><Button variant="text" disabled={locked} onClick={() => setConfirm('skip')}>End conversation</Button></div>
     {fight.turns.length > 0 && <details className="history"><summary>Your earlier answers<ChevronDown size={17} aria-hidden="true" /></summary>{fight.turns.map(turn => <div className="history-row" key={turn.turnIndex}><p className="eyebrow">{stageTitles[turn.stage]}</p><p>{turn.agentQuestion}</p><p className="your-answer">{turn.answerText}</p></div>)}</details>}
   </>;
-  if (current?.type === 'checkpoint') return <Page transitionKey={fightStep(fight)} number={<MessageSquareText size={42} aria-hidden="true" />} eyebrow="A moment to check in" title={current.question} className={`conversation-page checkpoint-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={current.afterStage} turns={fight.turns} checkpoint />}>
+  if (current?.type === 'checkpoint') return <Page transitionKey={fightStep(fight)} motionRef={motion.contentRef} number={<MessageSquareText size={42} aria-hidden="true" />} eyebrow="A moment to check in" title={current.question} className={`conversation-page checkpoint-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={current.afterStage} turns={fight.turns} checkpoint />}>
     <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Your private preparation</span><span>{fight.turns.length} answers saved</span></div>
     {feedback}
     <section className="checkpoint-summary" aria-label="Your private checkpoint summary">
@@ -266,7 +273,7 @@ export function FightPage() {
   const title = thermometer ? question.stage === 'thermometer_start' ? 'How upset are you right now?' : 'How upset are you now?'
     : story ? 'What happened? Keep it short.' : rehearsal ? 'Choose your first sentence.' : ready ? 'Ready to talk?' : question.agentQuestion;
   const examples = ['We had friends over. I cleaned up alone afterward.', 'My partner was late and did not text.', 'We argued about money for a trip.'];
-  return <Page transitionKey={fightStep(fight)} number={number} eyebrow={contextIndex >= 0 ? `Question ${contextIndex + 1}` : stageTitles[question.stage]} title={title} className={`conversation-page prototype-conversation ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} turns={fight.turns} />}>
+  return <Page transitionKey={fightStep(fight)} motionRef={motion.contentRef} number={number} eyebrow={contextIndex >= 0 ? `Question ${contextIndex + 1}` : stageTitles[question.stage]} title={title} className={`conversation-page prototype-conversation ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`} aside={<PreparationAside stage={question.stage} turns={fight.turns} />}>
     <div className="conversation-meta"><span className="conversation-owner"><LockKeyhole size={14} aria-hidden="true" />Only you see this</span></div>
     {feedback}
     {thermometer ? <div className="intensity-question">
@@ -293,7 +300,6 @@ export function FightPage() {
         <Button className="prototype-submit" disabled={(!selected && !answerText.trim()) || count > maxAnswerChars || locked} type="submit">{rehearsal ? 'I’m ready' : story ? 'Continue' : 'Next'}<ArrowRight size={18} aria-hidden="true" /></Button>
       </form>
     </>}
-    {question.stage === 'thermometer_start' && <details className="processing-disclosure"><summary>How your answers are used</summary><ProcessingNote /></details>}
     {navigation}
   </Page>;
 }
@@ -354,6 +360,7 @@ export function ResultPage() {
   const loadResult = resource.load;
   const hasFullResult = Boolean(result && !result.locked.includes('openingLine'));
   const recordId = result?.fightRecordId;
+  const isCurrent = couple?.currentSessionId === id;
 
   useEffect(() => {
     let stopped = false;
@@ -370,9 +377,9 @@ export function ResultPage() {
       }
       if (!stopped) timer = window.setTimeout(poll, delay);
     }
-    if (hasFullResult && !recordId) timer = window.setTimeout(poll, 3000);
+    if (hasFullResult && !recordId && isCurrent) timer = window.setTimeout(poll, 3000);
     return () => { stopped = true; if (timer) window.clearTimeout(timer); };
-  }, [hasFullResult, recordId, loadResult, refresh]);
+  }, [hasFullResult, recordId, isCurrent, loadResult, refresh]);
 
   useEffect(() => { void refresh().catch(() => undefined); }, [refresh]);
 
@@ -386,7 +393,7 @@ export function ResultPage() {
     try { await navigator.clipboard.writeText(couple.inviteUrl); setCopied(true); setCopyError(false); }
     catch { setCopyError(true); }
   }
-  return <Page eyebrow="You’re ready" title="Your plan for the talk." layout="wide" className={`result-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`}>
+  return <Page eyebrow={isCurrent ? 'You’re ready' : 'Previous conversation'} title="Your plan for the talk." layout="wide" className={`result-page ${couple?.partnerRole === 'B' ? 'conversation-partner' : ''}`}>
     <div className="prototype-ready-cards">
       <section className="opening-card"><h2>Only you see this</h2><p className="eyebrow">You feel</p><p>{result.feltText}</p><p className="eyebrow">You need</p><p>{result.needText}</p><p className="eyebrow">Your first sentence</p><blockquote className="summary-line">“{result.openingLine}”</blockquote></section>
       <section className="result-rules"><h2>Your shared topic</h2><h3>{topicLabel(result.neutralTopic)}</h3><p className="quiet">Agreements to suggest when you talk:</p>{result.sharedRules.map((rule, index) => <div className="result-rule" key={rule}><span>{index + 1}</span><p>{rule}</p></div>)}</section>
@@ -394,14 +401,15 @@ export function ResultPage() {
     <div className="prototype-ready-bottom">
       <section className="next-step">
         {result.fightRecordId ? <><h2>You’re both ready.</h2><p>After the conversation, check in about how it went.</p><Button onClick={() => navigate(`/journal/${result.fightRecordId}/rating`)}>Rate your conversation<ArrowRight size={18} /></Button><Link className="text-link" to="/journal">View journal</Link></>
-          : <><h2>{canInvite ? `Invite ${couple?.partnerName || 'your partner'} to prepare.` : 'Give each other a little time.'}</h2><p>{result.partnerStatus === 'in_progress' ? 'Your partner is preparing privately.' : 'One link. A private preparation. Free for your partner.'}</p>{canInvite && <><Button onClick={() => void copyInvite()}>{copied ? <Check size={18} /> : <Copy size={18} />}{copied ? 'Link copied' : 'Copy invite link'}</Button>{copyError && <label className="form-field">Copy this link to share<input readOnly value={couple?.inviteUrl || ''} onFocus={event => event.currentTarget.select()} /></label>}</>}</>
+          : !isCurrent ? <><h2>Saved in your journal</h2><p>This is your preparation for an earlier conversation. Find your current conversation and its invitation in the journal.</p><Link className="text-link" to="/journal">Open journal<ArrowRight size={16} /></Link></>
+            : <><h2>{canInvite ? `Invite ${couple?.partnerName || 'your partner'} to prepare.` : 'Give each other a little time.'}</h2><p>{result.partnerStatus === 'in_progress' ? 'Your partner is preparing privately.' : 'One link. A private preparation. Free for your partner.'}</p>{canInvite && <><Button onClick={() => void copyInvite()}>{copied ? <Check size={18} /> : <Copy size={18} />}{copied ? 'Link copied' : 'Copy invite link'}</Button>{copyError && <label className="form-field">Copy this link to share<input readOnly value={couple?.inviteUrl || ''} onFocus={event => event.currentTarget.select()} /></label>}</>}</>
         }
       </section>
       {result.thermometerStart !== null && <section className="thermometer-result"><h2>Your check-in</h2><div className="thermometer-comparison"><div><strong>{result.thermometerStart}</strong><span>Before</span></div>{result.thermometerEnd !== null && <><ArrowRight size={24} /><div><strong>{result.thermometerEnd}</strong><span>After</span></div></>}</div><p>How upset you felt, on a scale of 1–10.</p></section>}
     </div>
     {result.reflection && <details className="optional-reflection"><summary>Explore your personal reflection</summary><ConversationReflection reflection={result.reflection} /></details>}
     {resource.error && <Notice>{resource.error}<Button variant="text" onClick={() => void resource.load(true)}>Check again</Button></Notice>}
-    <Link className="text-link result-home" to="/home"><ArrowLeft size={16} />Return home</Link>
+    <Link className="text-link result-home" to="/journal"><ArrowLeft size={16} />Back to journal</Link>
   </Page>;
 }
 
@@ -472,7 +480,7 @@ export function PaywallPage() {
       {config.paymentMode === 'mock' && <p className="payment-mode-note">Demo checkout. Test card prefilled. No real charge.</p>}
       {config.paymentMode === 'stripe_test' && <p className="payment-mode-note">Test payment. Use Stripe test payment details.</p>}
     </section>
-    {id && <div className="paywall-skip">{skipConfirm ? <Notice><p>Skipping clears your private answers for this conversation.</p><div className="actions"><Button disabled={operation.busy} onClick={() => void skip()}>Skip this topic</Button><Button variant="text" onClick={() => setSkipConfirm(false)}>Cancel</Button></div></Notice> : <Button variant="text" disabled={operation.busy} onClick={() => setSkipConfirm(true)}>Skip this topic</Button>}</div>}
+    {id && <div className="paywall-skip">{skipConfirm ? <Notice><p>Ending this conversation clears your private answers.</p><div className="actions"><Button disabled={operation.busy} onClick={() => void skip()}>End conversation</Button><Button variant="text" onClick={() => setSkipConfirm(false)}>Cancel</Button></div></Notice> : <Button variant="text" disabled={operation.busy} onClick={() => setSkipConfirm(true)}>End conversation</Button>}</div>}
   </Page>;
 }
 

@@ -20,6 +20,8 @@ type CoupleResponse struct {
 	CoupleID             string                `json:"coupleId"`
 	PartnerRole          string                `json:"partnerRole"`
 	PartnerName          string                `json:"partnerName,omitempty"`
+	OwnProfile           *model.PartnerProfile `json:"ownProfile"`
+	PartnerStatus        string                `json:"partnerStatus"`
 	CurrentSessionID     *string               `json:"currentSessionId"`
 	InviteURL            string                `json:"inviteUrl"`
 	PartnerBStatus       string                `json:"partnerBStatus"`
@@ -113,6 +115,24 @@ type FightSessionResponse struct {
 	ThermometerStart *int              `json:"thermometerStart"`
 	ThermometerEnd   *int              `json:"thermometerEnd"`
 	CreatedAt        time.Time         `json:"createdAt"`
+}
+type ConversationListResponse struct {
+	Conversations []ConversationSummary `json:"conversations"`
+	CanStartNew   bool                  `json:"canStartNew"`
+}
+type ConversationSummary struct {
+	SessionID       string     `json:"sessionId"`
+	Status          string     `json:"status"`
+	Tier            string     `json:"tier"`
+	Stage           string     `json:"stage"`
+	NeutralTopic    *string    `json:"neutralTopic"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	CompletedAt     *time.Time `json:"completedAt"`
+	IsCurrent       bool       `json:"isCurrent"`
+	ResultAvailable bool       `json:"resultAvailable"`
+	FightRecordID   *string    `json:"fightRecordId"`
+	PartnerStatus   string     `json:"partnerStatus"`
+	InviteURL       string     `json:"inviteUrl"`
 }
 type FightSessionResultResponse struct {
 	SessionID        string                  `json:"sessionId"`

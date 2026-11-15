@@ -38,6 +38,7 @@ func New(app *service.App) http.Handler {
 			r.Post("/personality-tests", h.personality)
 			r.Get("/personality-tests/me", h.personalityMe)
 			r.Post("/fight-sessions", h.start)
+			r.Get("/fight-sessions", h.conversations)
 			r.Get("/fight-sessions/{sessionId}", h.fight)
 			r.Post("/fight-sessions/{sessionId}/turns", h.turn)
 			r.Post("/fight-sessions/{sessionId}/back", h.back)
@@ -141,6 +142,11 @@ func (h *Handler) start(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) fight(w http.ResponseWriter, r *http.Request) {
 	actor, _ := session.Actor(r.Context())
 	out, err := h.app.FightGet(actor, chi.URLParam(r, "sessionId"))
+	respond(w, 200, out, err)
+}
+func (h *Handler) conversations(w http.ResponseWriter, r *http.Request) {
+	actor, _ := session.Actor(r.Context())
+	out, err := h.app.Conversations(actor)
 	respond(w, 200, out, err)
 }
 func (h *Handler) turn(w http.ResponseWriter, r *http.Request) {

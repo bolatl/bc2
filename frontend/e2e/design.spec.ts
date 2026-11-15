@@ -64,46 +64,129 @@ async function completePreparation(page: Page, sentinel: string) {
   throw new Error('Preparation did not finish');
 }
 
-test('sakura follows the server stage, returns on Back, and respects reduced motion', async ({ page }) => {
+type MotionRecord = { target: string; phase: string | null; direction: string | null; x: number[]; delay: number };
+
+async function observeQuestionMotion(page: Page) {
+  await page.evaluate(() => {
+    const originalAnimate = Element.prototype.animate;
+    const records: MotionRecord[] = [];
+    document.documentElement.dataset.questionMotion = '[]';
+    Element.prototype.animate = function (keyframes, options) {
+      const animation = originalAnimate.call(this, keyframes, options);
+      const panel = this.closest('.page-content[data-transition-key]');
+      if (panel) {
+        const effect = animation.effect as KeyframeEffect;
+        records.push({
+          target: this === panel ? 'panel' : this.matches('.answer-card') ? 'answer' : 'other',
+          phase: panel.getAttribute('data-swipe-phase'),
+          direction: panel.getAttribute('data-swipe-direction'),
+          x: effect.getKeyframes().map(frame => Number(String(frame.transform).match(/translate(?:3d|X)?\(\s*(-?[\d.]+)/)?.[1] ?? 0)),
+          delay: effect.getTiming().delay,
+        });
+        document.documentElement.dataset.questionMotion = JSON.stringify(records);
+      }
+      return animation;
+    };
+  });
+}
+
+async function questionMotion(page: Page): Promise<MotionRecord[]> {
+  return page.evaluate(() => JSON.parse(document.documentElement.dataset.questionMotion || '[]'));
+}
+
+test('questions swipe with staggered answers, reverse on Back, and respect reduced motion', async ({ page }) => {
   await page.goto('/');
   await capture(page, 'landing');
   await post(page, '/couples', profile);
   const id = await start(page);
   const journey = page.locator('.sakura-journey');
   const camera = journey.locator('.journey-camera');
+  const panel = page.locator('.page-content[data-transition-key]');
   await expect(journey).toHaveAttribute('data-stage', 'thermometer_start');
   expect(await camera.evaluate(element => parseFloat(getComputedStyle(element).transitionDuration))).toBeGreaterThan(0);
-  // Observe the actual fading frames on the mounted question when its step changes.
-  await page.locator('.page-content[data-transition-key]').evaluate(element => {
-    const observer = new MutationObserver(() => {
-      if (element.getAnimations().some(animation => {
-        const frames = (animation.effect as KeyframeEffect).getKeyframes();
-        return frames.some(frame => Number(frame.opacity) < 1) && frames.some(frame => Number(frame.opacity) === 1);
-      })) {
-        element.setAttribute('data-observed-question-fade', 'true');
-        observer.disconnect();
-      }
-    });
-    observer.observe(element, { attributes: true, attributeFilter: ['data-transition-key'] });
-  });
+  await observeQuestionMotion(page);
   const initialPosition = await camera.getAttribute('style');
   await answer(page, id);
   await expect(journey).toHaveAttribute('data-stage', 'facts');
-  await expect(page.locator('.page-content[data-transition-key]')).toHaveAttribute('data-observed-question-fade', 'true');
+  await expect(panel).toHaveAttribute('data-swipe-phase', 'idle');
+  const forward = (await questionMotion(page)).filter(record => record.target === 'panel');
+  expect(forward.map(record => record.phase)).toEqual(['leaving', 'entering']);
+  expect(forward.every(record => record.direction === 'forward')).toBeTruthy();
+  expect(forward[0].x.at(-1)).toBeLessThan(0);
+  expect(forward[1].x[0]).toBeGreaterThan(0);
   const factsPosition = await camera.getAttribute('style');
   expect(factsPosition).not.toBe(initialPosition);
   await answer(page, id, 'I would like us to share the evening chores.');
   await expect(journey).toHaveAttribute('data-stage', 'feelings');
+  await expect(panel).toHaveAttribute('data-swipe-phase', 'idle');
   expect(await camera.getAttribute('style')).not.toBe(factsPosition);
+  const cards = (await questionMotion(page)).filter(record => record.target === 'answer');
+  expect(cards).toHaveLength(2);
+  expect(cards.every(record => record.phase === 'entering' && record.x[0] > 0)).toBeTruthy();
+  expect(cards[1].delay).toBeGreaterThan(cards[0].delay);
+  const motionBeforeSelection = await questionMotion(page);
+  const firstAnswer = page.locator('.answer-card').first();
+  await firstAnswer.click();
+  await expect(firstAnswer).toHaveAttribute('aria-pressed', 'true');
+  expect(await questionMotion(page)).toEqual(motionBeforeSelection);
   await capture(page, 'journey');
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('button', { name: 'Go back', exact: true }).click();
   await expect(journey).toHaveAttribute('data-stage', 'facts');
+  await expect(panel).toHaveAttribute('data-swipe-phase', 'idle');
+  const backward = (await questionMotion(page)).filter(record => record.target === 'panel' && record.direction === 'backward');
+  expect(backward.map(record => record.phase)).toEqual(['leaving', 'entering']);
+  expect(backward[0].x.at(-1)).toBeGreaterThan(0);
+  expect(backward[1].x[0]).toBeLessThan(0);
   expect(await camera.getAttribute('style')).toBe(factsPosition);
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  const motionBeforeReduce = await questionMotion(page);
   await answer(page, id, 'I would like to agree on a fair plan for chores.');
   await expect(journey).toHaveAttribute('data-stage', 'feelings');
+  expect(await questionMotion(page)).toEqual(motionBeforeReduce);
   await expect(camera).toHaveCSS('transition-duration', '0s');
+  await expect.poll(() => page.evaluate(() => document.getAnimations().filter(animation => animation.playState === 'running').length)).toBe(0);
+});
+
+test('questions stay in place while saving or after failure, and active motion can be reduced', async ({ page }) => {
+  await post(page, '/couples', profile);
+  const id = await start(page);
+  await answer(page, id);
+  const panel = page.locator('.page-content[data-transition-key]');
+  await expect(panel).toHaveAttribute('data-swipe-phase', 'idle');
+  await observeQuestionMotion(page);
+  const story = page.getByLabel('Your story', { exact: true });
+  const draft = 'I felt left alone with the dishes after dinner.';
+  await story.fill(draft);
+  let releaseRequest = () => {};
+  let requestStarted = () => {};
+  const heldRequest = new Promise<void>(resolve => { releaseRequest = resolve; });
+  const started = new Promise<void>(resolve => { requestStarted = resolve; });
+  await page.route(`**/fight-sessions/${id}/turns`, async route => {
+    requestStarted();
+    await heldRequest;
+    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'generation_unavailable', message: 'The next step could not be prepared.' }) });
+  }, { times: 1 });
+  try {
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await started;
+    await expect(story).toHaveValue(draft);
+    await expect(panel).toHaveAttribute('data-swipe-phase', 'idle');
+    await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
+    expect(await questionMotion(page)).toEqual([]);
+  } finally {
+    releaseRequest();
+  }
+  await expect(page.getByRole('alert')).toContainText("We couldn't prepare the next step. Please try again.");
+  await expect(story).toHaveValue(draft);
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeEnabled();
+  expect(await questionMotion(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(panel).toHaveAttribute('data-swipe-phase', 'entering');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(panel).toHaveAttribute('data-swipe-phase', 'idle');
+  await expect(page.locator('.sakura-journey')).toHaveAttribute('data-stage', 'feelings');
+  await expect(page.locator('.answer-card').first()).toBeEnabled();
   await expect.poll(() => page.evaluate(() => document.getAnimations().filter(animation => animation.playState === 'running').length)).toBe(0);
 });
 
@@ -125,17 +208,16 @@ test('personal and partner views use the current role and shared status without 
     await post(b, `/fight-sessions/${bFight.sessionId}/turns`, { turnIndex: 1, answerSource: 'free_text', answerText: privateB });
 
     await page.goto('/home');
-    await expect(page.getByRole('heading', { name: 'Your words are ready.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'My space', exact: true })).toBeVisible();
     await capture(page, 'home');
-    await page.locator('.personal-home-links a[href="/profile"]').click();
-    await expect(page.getByRole('heading', { name: 'Your space, made personal.', exact: true })).toBeVisible();
+    await page.locator('.site-header').getByRole('link', { name: 'My profile', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'My profile', exact: true })).toBeVisible();
     await expect(page.locator('.profile-role')).toHaveText('Partner A');
     await expect(page.locator('.profile-plan-status')).toHaveText('Full access is active');
     await expect(page.locator('main')).not.toContainText(privateB);
     await capture(page, 'profile');
-    await page.getByRole('link', { name: 'Your conversations', exact: true }).click();
-    await page.locator('.space-switch a[href="/partner"]').click();
-    await expect(page.getByRole('heading', { name: 'Two perspectives. Room for both.', exact: true })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Partner', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Your partner’s progress', exact: true })).toBeVisible();
     await expect(page.locator('main')).not.toContainText(privateA);
     await expect(page.locator('main')).not.toContainText(privateB);
     await expect(page.getByRole('heading', { name: 'Preparing privately', exact: true })).toBeVisible();
@@ -152,31 +234,27 @@ test('personal and partner views use the current role and shared status without 
   }
 });
 
-test('subscription previews stay blurred and inactive until a real mock checkout unlocks access', async ({ page }) => {
+test('journal remains accessible before payment while subscription access is preserved', async ({ page }) => {
   await post(page, '/couples', profile);
-  for (const [path, variant, apiPath] of [['/journal', 'journal', '/journal'], ['/stats', 'patterns', '/journal/stats']] as const) {
-    expect((await page.request.get(`${API}${apiPath}`)).status()).toBe(402);
-    await page.goto(path);
-    const preview = page.locator(`.locked-preview-${variant}`);
-    await expect(preview).toBeVisible();
-    await expect(preview.locator('.locked-preview-skeleton')).toHaveAttribute('inert', '');
-    await expect(preview.locator('.locked-preview-skeleton')).toHaveAttribute('aria-hidden', 'true');
-    await expect(preview.locator('.locked-preview-skeleton')).toHaveCSS('filter', 'blur(6px)');
-    await expect(preview.locator('.locked-preview-content')).toHaveCSS('filter', 'none');
-    await preview.locator('a[href="/paywall"]').click();
-    await expect(page).toHaveURL(/\/paywall$/);
-  }
+  const fight = await post<Fight>(page, '/fight-sessions', {});
+  expect((await page.request.get(`${API}/journal`)).status()).toBe(402);
+  expect((await page.request.get(`${API}/journal/stats`)).status()).toBe(402);
+  await page.goto('/journal');
+  await expect(page.getByRole('heading', { name: 'Your conversations', exact: true })).toBeVisible();
+  await expect(page.locator(`[data-session-id="${fight.sessionId}"]`)).toBeVisible();
+  await expect(page.locator('.locked-preview')).toHaveCount(0);
+  await page.goto('/stats');
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.getByRole('link', { name: 'Take the About me test', exact: true })).toBeVisible();
+  await page.goto('/paywall');
   await expect(page.getByRole('heading', { name: 'Start the talk with a sentence that works.' })).toBeVisible();
   await capture(page, 'paywall');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await completeDemoCheckout(page);
-  await expect(page).toHaveURL(/\/home$/);
   const updated = await get<Couple>(page, '/couples/me');
   expect(updated.subscription?.status).toBe('active');
-  for (const [path, apiPath] of [['/journal', '/journal'], ['/stats', '/journal/stats']] as const) {
-    expect((await page.request.get(`${API}${apiPath}`)).status()).toBe(200);
-    await page.goto(path);
-    await expect(page.locator('.locked-preview')).toHaveCount(0);
-    await expect(page.locator('main')).toContainText(/conversation/i);
-  }
+  for (const path of ['/journal', '/journal/stats']) expect((await page.request.get(`${API}${path}`)).status()).toBe(200);
+  await page.goto('/journal');
+  await expect(page.locator(`[data-session-id="${fight.sessionId}"]`)).toBeVisible();
+  await expect(page.locator('.locked-preview')).toHaveCount(0);
 });

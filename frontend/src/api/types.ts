@@ -22,3 +22,5 @@ export type FightRecord = Schema['FightRecordResponse'];
 export type Journal = Schema['JournalResponse'];
 export type JournalEntry = Schema['JournalEntryResponse'];
 export type Stats = Schema['JournalStatsResponse'];
+export type ConversationList = Schema['ConversationListResponse'];
+export type ConversationSummary = Schema['ConversationSummary'];

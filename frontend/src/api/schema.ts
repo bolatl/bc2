@@ -114,9 +114,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List the caller's current and previous private preparations
+         * @description Available without a subscription. Lists only the authenticated person's metadata, never the other partner's answers, result or profile. Current invitations are returned only to A after readiness. Older links expire when A starts a new round.
+         */
+        get: operations["listConversations"];
         put?: never;
-        /** Start a private session in the current round */
+        /**
+         * Start a private session in the current round
+         * @description A may start another round after finishing their preparation when B has not started or is ready. A partner still preparing is never interrupted. Each new round gets a fresh invitation token; old invitation links expire. An existing active couple subscription applies automatically.
+         */
         post: operations["createFightSession"];
         delete?: never;
         options?: never;
@@ -369,6 +376,11 @@ export interface components {
         PartnerRole: "A" | "B";
         /** @enum {string} */
         PartnerBStatus: "not_invited" | "invited" | "in_progress" | "ready";
+        /**
+         * @description The other person's preparation status for this round. Private skips and safety stops are not distinguished from in_progress.
+         * @enum {string}
+         */
+        PartnerPreparationStatus: "not_started" | "in_progress" | "ready";
         /** @enum {string} */
         FightStage: "thermometer_start" | "facts" | "feelings" | "needs" | "partner_view" | "rehearsal" | "thermometer_end" | "ready";
         /** @enum {string} */
@@ -419,15 +431,30 @@ export interface components {
              */
             activatedAt: string | null;
         };
+        /** @description Only the caller's saved onboarding information. Missing optional answers remain empty strings or null; no demographic values are inferred. This does not contain the other person's profile. */
+        OwnProfile: {
+            partnerName?: string;
+            source?: string;
+            age: string;
+            relationshipStatus: string;
+            togetherDuration: string;
+            hasKids: string;
+            conflictStyle: string;
+            repairNeed: string;
+            fightTopics: components["schemas"]["FightTopic"][] | null;
+            goal: string;
+        };
         CoupleResponse: {
             /** @description Opaque server-generated identifier. Do not infer order or encode user data. */
             coupleId: string;
             partnerRole: components["schemas"]["PartnerRole"];
             /** @description Partner name provided by this caller during onboarding. Omitted if unknown; never copied from the other partner's private profile. */
             partnerName?: string;
+            ownProfile: components["schemas"]["OwnProfile"] | null;
+            partnerStatus: components["schemas"]["PartnerPreparationStatus"];
             /** @description This owner's latest attempt in the current round, including completed, skipped or privately stopped attempts. Null if this owner has no attempt in that round; never another owner's ID. */
             currentSessionId: string | null;
-            /** @description Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A. */
+            /** @description Empty until paid and A is ready; then an absolute frontend invitation URL unique to the current round. Returned only to A. Starting a new round expires previous links. */
             inviteUrl: string;
             partnerBStatus: components["schemas"]["PartnerBStatus"];
             /**
@@ -588,6 +615,35 @@ export interface components {
             optionRight: string;
             answerSource: components["schemas"]["AnswerSource"];
             answerText: string;
+        };
+        ConversationListResponse: {
+            conversations: components["schemas"]["ConversationSummary"][];
+            /** @description Whether the current round allows this person to start a preparation. This is not a subscription entitlement; POST still checks payment. A starts a new round, while B joins the current ready round. */
+            canStartNew: boolean;
+        };
+        ConversationSummary: {
+            /** @description Opaque server-generated identifier. Do not infer order or encode user data. */
+            sessionId: string;
+            status: components["schemas"]["SessionStatus"];
+            tier: components["schemas"]["SessionTier"];
+            stage: components["schemas"]["FightStage"];
+            neutralTopic: components["schemas"]["FightTopic"] | null;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp in UTC.
+             */
+            createdAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** @description The caller's latest attempt in the current round. */
+            isCurrent: boolean;
+            /** @description A private result or free preview exists for this owned session. Use status to distinguish completed results from unfinished preparation. */
+            resultAvailable: boolean;
+            /** @description Corresponding shared journal record, if created. Check-in access still requires a plan and both partners ready. */
+            fightRecordId: string | null;
+            partnerStatus: components["schemas"]["PartnerPreparationStatus"];
+            /** @description Current ready A invitation only; otherwise empty. Never a link to another round or another person's private preparation. */
+            inviteUrl: string;
         };
         FightSessionResponse: {
             /** @description Opaque server-generated identifier. Do not infer order or encode user data. */
@@ -1184,6 +1240,35 @@ export interface operations {
             };
             /** @description Unexpected internal error. */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listConversations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Caller-owned conversations, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationListResponse"];
+                };
+            };
+            /** @description Anonymous session missing, invalid, or deleted. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

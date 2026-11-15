@@ -35,7 +35,7 @@ func (a *App) FightStart(ctx context.Context, actor model.Actor) (dto.FightSessi
 	oldA, oldB := a.roundSessions(c.ID, c.CurrentRoundID)
 	f := model.FightSession{ID: newID(), CoupleID: c.ID, PartnerRole: actor.PartnerRole, Status: "in_progress", Tier: "full", Stage: "thermometer_start", Turns: []model.FightTurn{}, CreatedAt: a.Now()}
 	if actor.PartnerRole == "A" {
-		if oldA != nil && !((oldA.Status == "completed" && oldB != nil && oldB.Status == "completed") || (stopped(oldA.Status) && (oldB == nil || stopped(oldB.Status)))) {
+		if !canOpenRound(oldA, oldB) {
 			return dto.FightSessionResponse{}, conflict("Finish or skip the current round before starting another.")
 		}
 		if !a.active(c.ID) {
@@ -63,6 +63,7 @@ func (a *App) FightStart(ctx context.Context, actor model.Actor) (dto.FightSessi
 	}
 	if actor.PartnerRole == "A" {
 		c.CurrentRoundID = f.RoundID
+		c.InviteToken = newID()
 		c.InviteEnabled = false
 		c.InviteSentAt = nil
 		c.PartnerBStatus = "not_invited"
@@ -383,10 +384,14 @@ func (a *App) resultView(actor model.Actor, c model.Couple, f model.FightSession
 		partnerStatus = "ready"
 	}
 	// For a past round, report that round's readiness, not a subsequent round.
-	if f.RoundID != c.CurrentRoundID {
+	if f.RoundID != c.CurrentRoundID && actor.PartnerRole == "A" {
+		partnerStatus = "invited"
 		_, other := a.roundSessions(c.ID, f.RoundID)
-		if actor.PartnerRole == "A" && other != nil && other.Status == "completed" {
-			partnerStatus = "ready"
+		if other != nil {
+			partnerStatus = "in_progress"
+			if other.Status == "completed" {
+				partnerStatus = "ready"
+			}
 		}
 	}
 	locked := []string{}

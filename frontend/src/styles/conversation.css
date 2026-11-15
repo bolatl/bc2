@@ -278,3 +278,7 @@
 @media (prefers-reduced-motion: reduce) {
   .voice-button.is-listening, .voice-dot { animation: none; }
 }
+/* Keep the moving cards inside the conversation area, including on mobile. */
+.conversation-page { overflow-x: clip; }
+.conversation-page .page-content[data-swipe-phase='leaving'],
+.conversation-page .page-content[data-swipe-phase='entering'] { will-change: transform, opacity; transform-origin: 50% 25%; }

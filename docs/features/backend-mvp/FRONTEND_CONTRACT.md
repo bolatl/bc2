@@ -16,6 +16,19 @@ Show an empty state for `[]` journal data, a missing-personality prompt for 404,
 
 After both are ready, either partner can submit `{"rating": 8}` or `{"rating": null}` immediately. The null choice means “we have not talked”; omitting `rating` is invalid. `averageRating: null` must not render as zero. Poll `/couples/me` or the owner's `/result` for readiness; the backend sends no SMS or push notifications. `partnerBInviteSentAt` denotes current-round availability, not actual delivery. It resets when a new round begins.
 
+## Navigation, owned history and repeat conversations
+
+The main pages have separate responsibilities:
+
+- `/journal`: the current user's current and previous conversations, links to resume or read their own result, shared check-ins where available, and **New conversation** for A (**Prepare your side** for B).
+- `/partner`: the other partner's current-round preparation status from `CoupleResponse.partnerStatus`, with a refresh action and visible-tab polling. Values are `not_started`, `in_progress`, and `ready`. Private stops are not disclosed as a distinct status. Never infer A's readiness from B's invitation status.
+- `/home`: **My space**, combining an overview with personal patterns from the About me test and shared conversation trends. Until `personalityDone` is true, show the test CTA and do not request personal results or shared statistics. `/stats` redirects to `/home`.
+- `/profile`: only the caller's saved onboarding information in `ownProfile`, their test state, access and data settings. Omit unanswered optional fields; never infer age, children, or other demographics from the partner's profile.
+
+`GET /fight-sessions` is authenticated but does not require payment. It returns `ConversationListResponse`: `conversations` contains only the caller's preparations, most recent first, including incomplete and completed attempts; `canStartNew` tells the UI whether the current round allows a start. It is not a payment entitlement: `POST /fight-sessions` remains authoritative for both state and access. Each `ConversationSummary` contains metadata and readiness, not raw answers, generated result text or the other partner's profile. Use `isCurrent` to split current and previous sections, `resultAvailable` together with `status` for result/resume links, and `fightRecordId` to retrieve the shared entry where available. Existing `GET /journal`, `/journal/{fightRecordId}`, and `/journal/stats` retain their paid shared-record behavior.
+
+An active couple subscription applies to every subsequent conversation. Do not open plan selection or checkout simply because **New conversation** was clicked. A may start another round once their preparation is completed or closed and the other partner is not currently preparing; B starts their own side of the existing ready round. Check `canStartNew` rather than recreating the state rules in the browser. On a successful new A round, the server rotates the invitation token and expires the previous link. The new link becomes shareable only after A finishes and access is active. Render only the returned `inviteUrl`, which is empty for older rounds and unavailable invitations; never construct or reuse an old invitation URL.
+
 ## Short flow and checkpoints
 
 The environment examples, Compose and Render Blueprint use `FUNNEL=full`, `FREE_TURNS=5`, and `ENABLE_REHEARSAL=true` for the prototype flow. With no environment configuration the legacy `FUNNEL=short` remains the server default: `thermometer_start`, `facts`, `feelings`, `needs`, `ready`. `FUNNEL=full` also includes `partner_view` and `thermometer_end`. `ENABLE_REHEARSAL=true` inserts `rehearsal` before closing steps in either flow. The API does not expose a funnel configuration field: render the actual current stage and returned history. The sidebar must not promise seven steps or mark an omitted perspective stage as completed. `turnsMax` is the configured answer budget, not the number of questions that remain. Short-flow results have `thermometerEnd: null`; show only starting intensity, with no invented ending score or comparison.
@@ -28,7 +41,7 @@ Until a checkpoint is answered, reloading returns the same checkpoint and `/turn
 
 ## Journal detail and persistence
 
-The UI route `/journal/:recordId` requests `GET /journal/{fightRecordId}`. The response contains the shared `FightRecordResponse` fields at the top level and a nullable `myResult` for the current caller. It never contains the partner's private result. Display topic, dates, ratings and status separately from the private guide. Keep the shared entry visible when `myResult` is null. **Check in** targets `/journal/:recordId/rating` for that same ID. Use cache keys scoped by couple, partner role and record ID; clear private state on identity changes. Journal access requires full access (`402` otherwise); missing or foreign records return `404`.
+The UI route `/journal/:recordId` requests `GET /journal/{fightRecordId}`. The response contains the shared `FightRecordResponse` fields at the top level and a nullable `myResult` for the current caller. It never contains the partner's private result. Display topic, dates, ratings and status separately from the private guide. Keep the shared entry visible when `myResult` is null. **Check in** targets `/journal/:recordId/rating` for that same ID. Use cache keys scoped by couple, partner role and record ID; clear private state on identity changes. Shared journal-entry access requires full access (`402` otherwise); missing or foreign records return `404`. The owned conversation list used by the Journal page is available separately through `GET /fight-sessions` without that payment gate.
 
 With a configured server `DATA_FILE` and a stable `SESSION_SECRET`, profiles, subscriptions, personality summaries, completed private results and journal entries survive restart. Raw answers, generated questions/cards and incomplete sessions are never written. Without `DATA_FILE`, server state is memory-only. The API exposes no persistence flag, so settings copy must describe these modes conditionally instead of claiming the local server has persistence enabled.
 
@@ -44,7 +57,7 @@ The hosted generator receives the current owner's prior questions, answer source
 
 In the unpaid preview, summary, facet labels, and explanations are available, while `practice` is explicit JSON `null`. Blur decorative practical-step placeholders; never put withheld text in the DOM. The insight page keeps this detailed reflection in an optional expandable section; the following opening preview and compact plan page are separate screens. Never fabricate a predicted partner reaction from the two opening sentences. Full access returns practical steps as text, including for an existing preview; an older result with no reflection should show an honest unavailable state, not fabricated chart data. The report always belongs to the caller and contains no partner's private answers or profile.
 
-The reflection adds one hosted-model request when reaching the teaser paywall and one when completing the final readiness step, after safety screening. Result and reflection generate concurrently within a shared 25-second action deadline; reflection output has an 1800-token budget and a maximum 22-second budget, shortened to reserve response time. A content repair is attempted only if at least 12 seconds remain. Invalid or timed-out reflection content uses a basic, answer-based reflection whose summary explicitly identifies it as such; render that summary without hiding the qualification. Provider/configuration errors and parent cancellation still fail the request and leave the submitted turn uncommitted. Checkpoints do not request a separate reflection. Generation does not run again for GET requests. Only the completed derived report is persisted with `DATA_FILE`; raw answers remain excluded and incomplete sessions are not persisted. The existing 21 API operations remain unchanged; the schema includes the optional rehearsal preview and onboarding additions.
+The reflection adds one hosted-model request when reaching the teaser paywall and one when completing the final readiness step, after safety screening. Result and reflection generate concurrently within a shared 25-second action deadline; reflection output has an 1800-token budget and a maximum 22-second budget, shortened to reserve response time. A content repair is attempted only if at least 12 seconds remain. Invalid or timed-out reflection content uses a basic, answer-based reflection whose summary explicitly identifies it as such; render that summary without hiding the qualification. Provider/configuration errors and parent cancellation still fail the request and leave the submitted turn uncommitted. Checkpoints do not request a separate reflection. Generation does not run again for GET requests. Only the completed derived report is persisted with `DATA_FILE`; raw answers remain excluded and incomplete sessions are not persisted. Existing operation payloads remain compatible; the schema also includes the optional rehearsal preview, saved own-profile fields, and the additive owned-conversation list.
 
 Generated questions, cards, results, and reflection prose use respectful, non-graphic paraphrases. User-supplied profanity or explicit descriptions are not instructions to repeat that language. Invalid output is rewritten or replaced by a safe contextual template; this does not censor the user's own answer field.
 
@@ -120,6 +133,8 @@ export type PartnerRole = "A" | "B";
 
 export type PartnerBStatus = "not_invited" | "invited" | "in_progress" | "ready";
 
+export type PartnerPreparationStatus = "not_started" | "in_progress" | "ready";
+
 export type FightStage = "thermometer_start" | "facts" | "feelings" | "needs" | "partner_view" | "rehearsal" | "thermometer_end" | "ready";
 
 export type AnswerSource = "card_left" | "card_right" | "free_text";
@@ -166,14 +181,31 @@ export interface SubscriptionResponse {
   activatedAt: string | null;
 }
 
+export interface OwnProfile {
+  partnerName?: string;
+  source?: string;
+  age: string;
+  relationshipStatus: string;
+  togetherDuration: string;
+  hasKids: string;
+  conflictStyle: string;
+  repairNeed: string;
+  fightTopics: FightTopic[] | null;
+  goal: string;
+}
+
 export interface CoupleResponse {
   /** Opaque server-generated identifier. Do not infer order or encode user data. */
   coupleId: string;
   /** Current browser's server-verified role. */
   partnerRole: PartnerRole;
+  /** Only the caller's saved onboarding information; optional answers remain empty. */
+  ownProfile: OwnProfile | null;
+  /** The other partner's readiness in the current round; no private-stop disclosure. */
+  partnerStatus: PartnerPreparationStatus;
   /** Own latest attempt in the current round, including terminal states; never another owner's ID. */
   currentSessionId: string | null;
-  /** Empty until paid and A is ready; then an absolute frontend invitation URL. Returned only to A. */
+  /** Empty until paid and A is ready; unique to the current round. A new round expires older links. Returned only to A. */
   inviteUrl: string;
   partnerBStatus: PartnerBStatus;
   /** Time invitation became shareable in the current round; null before readiness; not delivery confirmation. */
@@ -318,6 +350,28 @@ export interface FightTurn {
   optionRight: string;
   answerSource: AnswerSource;
   answerText: string;
+}
+
+export interface ConversationListResponse {
+  conversations: ConversationSummary[];
+  /** Whether the round allows a start; POST still checks subscription access. */
+  canStartNew: boolean;
+}
+
+export interface ConversationSummary {
+  sessionId: string;
+  status: SessionStatus;
+  tier: SessionTier;
+  stage: FightStage;
+  neutralTopic: FightTopic | null;
+  createdAt: string;
+  completedAt: string | null;
+  isCurrent: boolean;
+  resultAvailable: boolean;
+  fightRecordId: string | null;
+  partnerStatus: PartnerPreparationStatus;
+  /** Current ready A invitation only; otherwise empty. */
+  inviteUrl: string;
 }
 
 export interface FightSessionResponse {

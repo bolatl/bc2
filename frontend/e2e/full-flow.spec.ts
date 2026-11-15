@@ -56,9 +56,14 @@ test('two private preparations, checkout, shared journal, ratings and deletion',
   await page.getByRole('button', { name: 'Rate your conversation' }).click();
   await page.getByRole('slider', { name: 'Conversation rating, 1 to 10' }).fill('8');
   await page.getByRole('button', { name: 'Save rating' }).click();
-  await expect(page.locator('.journal-rating strong')).toHaveText('8.5');
+  await expect(page.locator('.record-status strong')).toContainText('8.5 / 10 together');
+  expect((await page.request.post(`${API}/personality-tests`, { data: { answers: Array(20).fill(3) } })).ok()).toBeTruthy();
   await page.goto('/stats');
-  await expect(page.locator('.stat-line strong')).toHaveText('1');
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.getByRole('heading', { name: 'Your conversations over time', exact: true })).toBeVisible();
+  await expect(page.locator('.space-history-summary > strong')).toHaveText('1');
+  const stats = await (await page.request.get(`${API}/journal/stats`)).json();
+  expect(stats.totalFights).toBe(1);
   await page.goto('/settings');
   await page.getByRole('button', { name: 'Delete everything', exact: true }).click();
   await page.getByRole('button', { name: 'Yes, delete everything' }).click();
@@ -87,8 +92,8 @@ test('generation failure keeps draft; reload, back and skip reconcile server sta
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('button', { name: 'Go back', exact: true }).click();
   await expect(page.getByLabel('Your story', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Skip this topic', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip this topic', exact: true }).first().click();
+  await page.getByRole('button', { name: 'End conversation', exact: true }).click();
+  await page.getByRole('button', { name: 'End conversation', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'We can leave this here.' })).toBeVisible();
   expect((await (await page.request.get(`${API}/fight-sessions/${id}`)).json()).turns).toEqual([]);
 });

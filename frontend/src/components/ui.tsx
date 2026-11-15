@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { ArrowRight, LockKeyhole } from 'lucide-react';
 export { ArrowRight };
 
@@ -10,7 +10,7 @@ export function BrandMark({ size = 40, className = '' }: { size?: number; classN
 export function Button({ variant = 'primary', className = '', type = 'button', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'text' }) {
   return <button type={type} className={`button button-${variant} ${className}`} {...props} />;
 }
-export function Page({ eyebrow, title, description, number, children, className = '', layout = 'form', aside, transitionKey }: { eyebrow?: ReactNode; title: ReactNode; description?: ReactNode; number?: ReactNode; children?: ReactNode; className?: string; layout?: 'wide' | 'form'; aside?: ReactNode; transitionKey?: string }) {
+export function Page({ eyebrow, title, description, number, children, className = '', layout = 'form', aside, transitionKey, motionRef }: { eyebrow?: ReactNode; title: ReactNode; description?: ReactNode; number?: ReactNode; children?: ReactNode; className?: string; layout?: 'wide' | 'form'; aside?: ReactNode; transitionKey?: string; motionRef?: RefObject<HTMLDivElement | null> }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const previousStep = useRef(transitionKey);
@@ -23,7 +23,7 @@ export function Page({ eyebrow, title, description, number, children, className 
     if (headingTop !== undefined && (headingTop < 0 || headingTop > window.innerHeight - 120)) {
       heading.current?.scrollIntoView({ block: 'start', behavior: reducedMotion ? 'instant' : 'smooth' });
     }
-    if (reducedMotion) return;
+    if (reducedMotion || motionRef) return;
     const animation = content.current.animate([
       { opacity: .35, transform: 'translate3d(0, 12px, 0)' },
       { opacity: 1, transform: 'translate3d(0, 0, 0)' },
@@ -32,11 +32,11 @@ export function Page({ eyebrow, title, description, number, children, className 
     const stop = () => { if (preference.matches) animation.cancel(); };
     preference.addEventListener('change', stop);
     return () => { animation.cancel(); preference.removeEventListener('change', stop); };
-  }, [transitionKey]);
+  }, [transitionKey, motionRef]);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [title]);
   return <section className={`page-grid page-${layout} ${className}`}>
     {layout === 'form' && <aside className="page-aside"><div className="page-context">{eyebrow && <div className="eyebrow">{eyebrow}</div>}{number !== undefined && <div className={`page-number ${typeof number === 'string' && number.length > 3 ? 'page-label' : ''}`}>{number}</div>}{aside || <div className="context-privacy"><LockKeyhole size={18} aria-hidden="true" /><p>A little room for your perspective.<span>Your answers stay private from your partner.</span></p></div>}</div></aside>}
-    <div className="page-content" ref={content} data-transition-key={transitionKey}><header className="page-heading">{layout === 'wide' && eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1 tabIndex={-1} ref={heading}>{title}</h1>{description && <div className="lead">{description}</div>}</header>{children}</div>
+    <div className="page-content" ref={element => { content.current = element; if (motionRef) motionRef.current = element; }} data-transition-key={transitionKey}><header className="page-heading">{layout === 'wide' && eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1 tabIndex={-1} ref={heading}>{title}</h1>{description && <div className="lead">{description}</div>}</header>{children}</div>
   </section>;
 }
 export function Notice({ children, kind = 'info' }: { children: ReactNode; kind?: string }) {

@@ -35,9 +35,6 @@
 .prototype-submit { width: 100%; margin-top: 22px; }
 .conversation-page .answer-footer { justify-content: flex-end; }
 .conversation-page .keyboard-hint { display: none; }
-.processing-disclosure { margin-top: 22px; color: var(--ink-muted); font-size: 12px; }
-.processing-disclosure summary { cursor: pointer; }
-.processing-disclosure .processing-note { margin-top: 10px; }
 .insight-page, .rehearsal-preview-page, .prototype-paywall { max-width: 920px; margin-inline: auto; }
 .insight-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .insight-card { padding: 28px; border: 1px solid var(--rule); border-radius: var(--radius-lg); background: var(--you-soft); }
