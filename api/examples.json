@@ -29,7 +29,21 @@
         "personalityDone": false,
         "createdAt": "2026-11-15T04:00:00Z",
         "partnerRole": "A",
-        "currentSessionId": null
+        "currentSessionId": null,
+        "ownProfile": {
+          "age": "30-34",
+          "relationshipStatus": "married",
+          "togetherDuration": "3-7",
+          "hasKids": "no",
+          "conflictStyle": "talk_now",
+          "repairNeed": "plan",
+          "fightTopics": [
+            "chores",
+            "time_attention"
+          ],
+          "goal": "understand_each_other"
+        },
+        "partnerStatus": "not_started"
       }
     },
     {
@@ -51,7 +65,21 @@
         "personalityDone": true,
         "createdAt": "2026-11-15T04:00:00Z",
         "partnerRole": "A",
-        "currentSessionId": "session_a_demo"
+        "currentSessionId": "session_a_demo",
+        "ownProfile": {
+          "age": "30-34",
+          "relationshipStatus": "married",
+          "togetherDuration": "3-7",
+          "hasKids": "no",
+          "conflictStyle": "talk_now",
+          "repairNeed": "plan",
+          "fightTopics": [
+            "chores",
+            "time_attention"
+          ],
+          "goal": "understand_each_other"
+        },
+        "partnerStatus": "ready"
       }
     },
     {
@@ -480,7 +508,8 @@
       },
       "response": {
         "checkoutUrl": "http://localhost:5173/checkout/demo?session_id=cs_mock_example&demo=true",
-        "checkoutSessionId": "cs_mock_example"
+        "checkoutSessionId": "cs_mock_example",
+        "amountUsd": 199
       }
     },
     {
@@ -493,7 +522,8 @@
       },
       "response": {
         "checkoutUrl": "http://localhost:5173/checkout/demo?session_id=cs_mock_example&demo=true",
-        "checkoutSessionId": "cs_mock_example"
+        "checkoutSessionId": "cs_mock_example",
+        "amountUsd": 199
       }
     },
     {
@@ -831,6 +861,41 @@
           "stop",
           "continue"
         ]
+      }
+    },
+    {
+      "name": "conversations-empty",
+      "method": "GET",
+      "path": "/api/v1/fight-sessions",
+      "status": 200,
+      "response": {
+        "conversations": [],
+        "canStartNew": true
+      }
+    },
+    {
+      "name": "conversations-current",
+      "method": "GET",
+      "path": "/api/v1/fight-sessions",
+      "status": 200,
+      "response": {
+        "conversations": [
+          {
+            "sessionId": "session_a_demo",
+            "status": "in_progress",
+            "tier": "free_short",
+            "stage": "thermometer_start",
+            "neutralTopic": null,
+            "createdAt": "2026-11-15T04:00:00Z",
+            "completedAt": null,
+            "isCurrent": true,
+            "resultAvailable": false,
+            "fightRecordId": null,
+            "partnerStatus": "not_started",
+            "inviteUrl": ""
+          }
+        ],
+        "canStartNew": false
       }
     }
   ]

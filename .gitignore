@@ -80,7 +80,14 @@ Desktop.ini
 *.bak
 *~
 
-# Local source material; generated documentation and project skills stay tracked.
+# Local agent skills, planning documents, and archived development guides.
+/.agents/
+/.codex/
+/.claude/
+/docs/
+/frontend/README.md
+
+# Local source material and prototypes.
 /LoveLab_BACKEND_PROMPT.md
 /LoveLab_FINAL.md
 /LoveLab_dev_flow_v0.md

@@ -1,10 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { answerCurrent, capturePrototype, fightState, openPlanFromInsight } from './flow-helpers';
 import { completeDemoCheckout } from './checkout-helpers';
+import { canonicalQuestions } from './fixtures/mini-ipip';
 
 const apiOrigin = 'http://localhost:18080';
-const canonicalQuestions = [...readFileSync(new URL('../../docs/features/backend-mvp/FRONTEND_CONTRACT.md', import.meta.url), 'utf8').matchAll(/^\d+\. (.+)$/gm)].map((match) => match[1]);
 const accuracyLabels = ['Very inaccurate', 'Moderately inaccurate', 'Neither inaccurate nor accurate', 'Moderately accurate', 'Very accurate'];
 
 test('four short onboarding steps lead through the complete prototype flow and save the edited rehearsal', async ({ page }) => {

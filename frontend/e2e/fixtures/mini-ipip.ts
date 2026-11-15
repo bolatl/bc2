@@ -1,0 +1,23 @@
+// Independent expected copy and order for the Mini-IPIP questionnaire.
+export const canonicalQuestions = [
+  'Am the life of the party.',
+  'Sympathize with others’ feelings.',
+  'Get chores done right away.',
+  'Have frequent mood swings.',
+  'Have a vivid imagination.',
+  'Don’t talk a lot.',
+  'Am not interested in other people’s problems.',
+  'Often forget to put things back in their proper place.',
+  'Am relaxed most of the time.',
+  'Am not interested in abstract ideas.',
+  'Talk to a lot of different people at parties.',
+  'Feel others’ emotions.',
+  'Like order.',
+  'Get upset easily.',
+  'Have difficulty understanding abstract ideas.',
+  'Keep in the background.',
+  'Am not really interested in others.',
+  'Make a mess of things.',
+  'Seldom feel blue.',
+  'Do not have a good imagination.',
+] as const;

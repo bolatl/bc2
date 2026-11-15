@@ -21,7 +21,7 @@ export const partnerQuestions: ProfileQuestion[] = [
   ...profileQuestions.filter(({ key }) => key === 'conflictStyle' || key === 'repairNeed'),
 ];
 
-// Canonical Mini-IPIP order from docs/features/backend-mvp/FRONTEND_CONTRACT.md.
+// Keep the canonical Mini-IPIP order; the backend scores answers by item position.
 export const personalityQuestions = [
   'Am the life of the party.',
   'Sympathize with others’ feelings.',

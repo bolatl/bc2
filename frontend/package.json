@@ -12,7 +12,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "api:generate": "openapi-typescript ../docs/features/backend-mvp/OPENAPI.yaml -o src/api/schema.ts",
+    "api:generate": "openapi-typescript ../api/openapi.yaml -o src/api/schema.ts",
     "test:e2e": "playwright test",
     "test:e2e:v2": "playwright test -c playwright.v2.config.ts"
   },

@@ -1,10 +1,5 @@
-# Complete tool list and installation instructions: README.md ("Все необходимые инструменты").
-# System prerequisites, installed separately: Go 1.26, Node.js 24 with npm,
-# Python 3.10+ with venv/pip, and Make with a POSIX shell.
-# Tests also use a C compiler (Go -race) and Playwright's Chromium.
-# `make setup` installs Go modules, npm packages, these Python packages, and Chromium.
-# This pip file contains Python packages only; Go/npm use their own manifests.
-# Python tooling for docs/features/backend-mvp/validate_contract.py:
+# Optional Python tooling for scripts/validate_contract.py (Python 3.10+).
+# Install with `make setup-python`; the application itself uses Go and npm.
 PyYAML==6.0.3
 jsonschema[format-nongpl]==4.25.0
 referencing==0.37.0

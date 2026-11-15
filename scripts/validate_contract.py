@@ -14,13 +14,13 @@ import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
-ROOT = Path(__file__).resolve().parent
-spec = yaml.safe_load((ROOT / 'OPENAPI.yaml').read_text())
+ROOT = Path(__file__).resolve().parents[1]
+spec = yaml.safe_load((ROOT / 'api/openapi.yaml').read_text())
 assert spec['openapi'] == '3.1.0'
 operations = {(method.upper(), path): op for path, item in spec['paths'].items()
               for method, op in item.items() if method in ('get', 'post', 'delete', 'put', 'patch')}
-assert len(operations) == 21, f'Expected 21 business operations, got {len(operations)}'
-router = (ROOT.parents[2] / 'internal/handler/router.go').read_text()
+assert len(operations) == 22, f'Expected 22 business operations, got {len(operations)}'
+router = (ROOT / 'internal/handler/router.go').read_text()
 registered = {(method.upper(), '/api/v1' + path)
               for method, path in re.findall(r'(?m)^\s*r\.(Get|Post|Delete|Put|Patch)\("([^"]+)"', router)}
 assert registered == set(operations), f'Router/schema mismatch: {registered ^ set(operations)}'
@@ -54,7 +54,7 @@ def validate(payload, schema, label):
     errors = sorted(validator.iter_errors(payload), key=lambda e: str(e.path))
     assert not errors, label + ': ' + '; '.join(e.message for e in errors)
 
-fixtures = json.loads((ROOT / 'MOCK_RESPONSES.json').read_text())['scenarios']
+fixtures = json.loads((ROOT / 'api/examples.json').read_text())['scenarios']
 covered = set()
 for case in fixtures:
     candidates = [(key, op) for key, op in operations.items()
@@ -87,14 +87,14 @@ print(f'{len(operations)} operations, {len(spec["components"]["schemas"])} schem
 
 
 def validate_live(base_url):
-    """Exercise all 21 routes with synthetic data and check real response schemas."""
+    """Exercise all 22 routes with synthetic data and check real response schemas."""
     import http.cookiejar
     import importlib.util
     import urllib.error
     import urllib.parse
     import urllib.request
 
-    demo_path = ROOT.parents[2] / 'scripts/demo.py'
+    demo_path = ROOT / 'scripts/demo.py'
     module_spec = importlib.util.spec_from_file_location('lovelab_demo', demo_path)
     demo = importlib.util.module_from_spec(module_spec)
     old_bytecode_setting = sys.dont_write_bytecode
@@ -152,6 +152,8 @@ def validate_live(base_url):
         a.request('GET', '/personality-tests/me')
         a.request('GET', '/subscriptions/me')
         session_id = a.request('POST', '/fight-sessions', {})['sessionId']
+        conversations = a.request('GET', '/fight-sessions')
+        assert [item['sessionId'] for item in conversations['conversations']] == [session_id]
         a.request('POST', f'/fight-sessions/{session_id}/turns',
                   {'turnIndex': 0, 'answerSource': 'free_text', 'answerText': '8'})
         a.request('POST', f'/fight-sessions/{session_id}/back', {'turnIndex': 0})
@@ -194,7 +196,7 @@ def validate_live(base_url):
             a.request('DELETE', '/couples/me')
     flag_gated = {('POST', '/api/v1/fight-sessions/{sessionId}/checkpoint')}
     assert live_covered | flag_gated == set(operations), f'Missing live routes: {set(operations) - live_covered - flag_gated}'
-    print(f'Live validation passed: {count} actual response bodies across all 21 operations; synthetic couple deleted.')
+    print(f'Live validation passed: {count} actual response bodies across all {len(operations)} operations; synthetic couple deleted.')
 
 
 if '--live-url' in sys.argv:
